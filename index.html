@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AETHERIS ARCHITECT | Build 2026.2.0 (Cycles)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --color-void: #050505;
+            --color-concrete: #8a8a8a;
+            --color-interface: rgba(255, 255, 255, 0.9);
+            --color-accent: #ff3e3e;
+            --color-success: #00ffaa;
+            --color-energy: #00d9ff;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--color-void);
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            cursor: none;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        #scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 5;
+            opacity: 0.3;
+        }
+
+        .hud-text {
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 0.75rem;
+            color: var(--color-interface);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+            background: rgba(0,0,0,0.4);
+            padding: 8px 12px;
+            backdrop-filter: blur(4px);
+            border-left: 2px solid rgba(255,255,255,0.2);
+        }
+
+        #reticle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            background: white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            mix-blend-mode: exclusion;
+            box-shadow: 0 0 10px white;
+        }
+        
+        #reticle.hover {
+            width: 20px;
+            height: 20px;
+            background: transparent;
+            border: 1px solid var(--color-energy);
+            transform: translate(-50%, -50%) rotate(45deg);
+        }
+
+        #reticle.active {
+            width: 10px;
+            height: 10px;
+            background: var(--color-energy);
+            transform: translate(-50%, -50%) scale(0.8);
+        }
+
+        #objective-bar {
+            width: 300px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            margin-top: 10px;
+            position: relative;
+        }
+        
+        #objective-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--color-success);
+            transition: width 0.5s ease;
+            box-shadow: 0 0 10px var(--color-success);
+        }
+
+        #start-screen, #cycle-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 5, 5, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            pointer-events: auto;
+            backdrop-filter: blur(20px);
+            transition: opacity 1s ease-out;
+            cursor: pointer;
+        }
+        
+        #cycle-screen { display: none; pointer-events: none; }
+
+        .loader-bar { width: 200px; height: 2px; background: #333; margin-top: 20px; position: relative; overflow: hidden; }
+        .loader-progress { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: white; animation: load 2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        @keyframes load { to { width: 100%; } }
+        .fade-in { animation: fadeIn 2s ease forwards; opacity: 0; }
+        @keyframes fadeIn { to { opacity: 1; } }
+
+        /* Notification de succès */
+        #success-message {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            opacity: 0;
+            transition: opacity 1s;
+        }
+        #success-message.visible { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <div id="scanlines"></div>
+
+    <div id="ui-layer">
+        <div class="flex justify-between p-8 w-full items-start">
+            <div>
+                <div class="hud-text border-l-4 !border-white">
+                    OBJECTIF PRINCIPAL<br>
+                    <span class="text-xs text-gray-400">RESTAURER LA COHÉRENCE DU SECTEUR</span>
+                    <div id="objective-bar"><div id="objective-fill"></div></div>
+                    <div class="mt-2 text-xs tracking-widest text-[var(--color-success)]" id="objective-count">NOYAUX: 0/3</div>
+                </div>
+            </div>
+            <div class="hud-text text-right">
+                MODULE: ARCHITECT<br>
+                CYCLE: <span id="cycle-display">1 / 7</span>
+            </div>
+        </div>
+
+        <div id="success-message">
+            <h1 class="text-6xl text-white font-thin tracking-[1em] mb-4 text-[var(--color-success)]">SYNCHRONISÉ</h1>
+            <p class="text-sm tracking-widest text-white">STRUCTURE STABILISÉE.</p>
+        </div>
+
+        <div id="reticle"></div>
+
+        <div class="flex justify-between p-8 w-full items-end">
+            <div class="hud-text">
+                [ZQSD/FLÈCHES] DÉPLACEMENT &nbsp; [ESPACE] SAUT<br>
+                [CLIC GAUCHE] IMPULSION D'ALIGNEMENT
+            </div>
+            <div id="perf-monitor" class="hud-text text-right">
+                FPS: <span id="fps-counter">60</span><br>
+                ENTROPIE: <span id="entropy-val">12%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Écran de début -->
+    <div id="start-screen">
+        <h1 class="text-5xl font-light tracking-[0.5em] text-white mb-4 fade-in">AETHERIS</h1>
+        <p class="hud-text text-gray-400 fade-in" style="animation-delay: 0.5s;">CLIQUEZ POUR INITIALISER LE CYCLE 1</p>
+        <div class="loader-bar fade-in" style="animation-delay: 0.8s;">
+            <div class="loader-progress"></div>
+        </div>
+    </div>
+
+    <!-- Écran de transition de cycle -->
+    <div id="cycle-screen">
+        <h1 id="cycle-title" class="text-4xl font-light tracking-[0.3em] text-white mb-4">CYCLE TERMINÉ</h1>
+        <p class="hud-text text-[var(--color-energy)]">RECONFIGURATION DE L'ARCHITECTURE...</p>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+                "@dimforge/rapier3d-compat": "https://unpkg.com/@dimforge/rapier3d-compat@0.12.0/rapier.es.js",
+                "tone": "https://unpkg.com/tone@14.7.77/build/Tone.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
+        import RAPIER from '@dimforge/rapier3d-compat';
+        
+        const CONFIG = {
+            fov: 80,
+            renderDistance: 200,
+            playerSpeed: 12.0,
+            playerJump: 18.0,
+            gravity: { x: 0.0, y: -25.0, z: 0.0 },
+            maxCycles: 7
+        };
+
+        // Palettes par Cycle pour ambiance progressive
+        const CYCLES_PALETTES = [
+            // Cycle 1: Cyan (Tuto/Calme)
+            { fog: 0x081015, light: 0xaaccff, accent: 0x00d9ff, concrete: 0x505055 },
+            // Cycle 2: Vert (Organique/Mystère)
+            { fog: 0x051505, light: 0xccffcc, accent: 0x00ff88, concrete: 0x445544 },
+            // Cycle 3: Or (Ancien/Solennel)
+            { fog: 0x151005, light: 0xffddaa, accent: 0xffaa00, concrete: 0x555044 },
+            // Cycle 4: Violet (Éthéré/Rêve)
+            { fog: 0x100515, light: 0xccaaff, accent: 0xaa00ff, concrete: 0x504455 },
+            // Cycle 5: Rouge (Alerte/Instable)
+            { fog: 0x150505, light: 0xffaaaa, accent: 0xff0044, concrete: 0x554444 },
+            // Cycle 6: Gris Sombre (Néant/Vide)
+            { fog: 0x000000, light: 0x888888, accent: 0xffffff, concrete: 0x222222 },
+            // Cycle 7: Blanc Pur (Transcendance)
+            { fog: 0xeeeeee, light: 0xffffff, accent: 0x000000, concrete: 0xffffff }
+        ];
+
+        class AudioManager {
+            constructor() {
+                this.initialized = false;
+                this.ctx = null;
+                this.ambience = null;
+            }
+
+            async init() {
+                if(this.initialized) return;
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioContext();
+                
+                // Ambiance de fond
+                const bufferSize = 2 * this.ctx.sampleRate;
+                const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                
+                let lastOut = 0;
+                for (let i = 0; i < bufferSize; i++) {
+                    const white = Math.random() * 2 - 1;
+                    output[i] = (lastOut + (0.02 * white)) / 1.02;
+                    lastOut = output[i];
+                    output[i] *= 3.5; 
+                }
+                
+                this.ambience = this.ctx.createBufferSource();
+                this.ambience.buffer = noiseBuffer;
+                this.ambience.loop = true;
+                const gain = this.ctx.createGain();
+                gain.gain.value = 0.03;
+                this.ambience.connect(gain);
+                gain.connect(this.ctx.destination);
+                this.ambience.start();
+                this.initialized = true;
+            }
+
+            triggerPulse() {
+                if(!this.initialized) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.3);
+            }
+
+            triggerSuccess() {
+                if(!this.initialized) return;
+                [440, 554, 659].forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + 0.1 + (i*0.05));
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 3);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 3);
+                });
+            }
+            
+            triggerCycleComplete() {
+                if(!this.initialized) return;
+                // Son plus grave et long pour la fin de cycle
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(110, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(55, this.ctx.currentTime + 2);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 4);
+                
+                // Filtre Lowpass pour effet "sous l'eau"
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(1000, this.ctx.currentTime);
+                filter.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 2);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 4);
+            }
+        }
+
+        class ProceduralArchitect {
+            constructor() {
+                this.materials = {}; // Init vide, rempli par setPalette
+            }
+
+            setPalette(palette) {
+                this.materials = {
+                    concrete: new THREE.MeshStandardMaterial({
+                        color: palette.concrete,
+                        roughness: 0.9,
+                        metalness: 0.2,
+                        flatShading: true,
+                    }),
+                    core: new THREE.MeshPhysicalMaterial({
+                        color: palette.accent,
+                        metalness: 0.1,
+                        roughness: 0.05,
+                        transmission: 0.9,
+                        thickness: 1.5,
+                        emissive: palette.accent,
+                        emissiveIntensity: 0.2
+                    }),
+                    socket: new THREE.MeshStandardMaterial({
+                        color: 0x222222,
+                        emissive: 0x000000,
+                        roughness: 0.5,
+                        metalness: 0.8
+                    }),
+                    socketActive: new THREE.MeshStandardMaterial({
+                        color: 0x00ffaa,
+                        emissive: 0x00ffaa,
+                        emissiveIntensity: 0.8,
+                        roughness: 0.2
+                    }),
+                    accentColor: palette.accent
+                };
+            }
+
+            createSocketMesh() {
+                const geometry = new THREE.CylinderGeometry(2.5, 2.5, 0.2, 32);
+                const mesh = new THREE.Mesh(geometry, this.materials.socket.clone());
+                mesh.receiveShadow = true;
+                return mesh;
+            }
+
+            createCoreMesh() {
+                const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+                const mesh = new THREE.Mesh(geometry, this.materials.core.clone());
+                mesh.castShadow = true;
+                const light = new THREE.PointLight(this.materials.accentColor, 3, 10);
+                mesh.add(light);
+                return mesh;
+            }
+        }
+
+        class App {
+            constructor() {
+                this.ready = false;
+                this.currentCycle = 1;
+                this.container = document.body;
+                this.clock = new THREE.Clock();
+                this.audio = new AudioManager();
+                this.architect = new ProceduralArchitect();
+                
+                this.physicsWorld = null;
+                this.levelObjects = []; // Stocke les objets à nettoyer (meshes et bodies)
+                
+                this.sockets = []; 
+                this.cores = []; 
+                this.characterBody = null;
+                
+                this.score = 0;
+                this.maxScore = 3; // 3 cœurs par cycle
+                
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2(0,0);
+                
+                this.verticalVelocity = 0;
+                this.canJump = false;
+            }
+
+            async initPhysics() {
+                await RAPIER.init();
+                this.physicsWorld = new RAPIER.World(CONFIG.gravity);
+            }
+
+            initGraphics() {
+                this.scene = new THREE.Scene();
+                // Couleur init (sera écrasée par loadCycle)
+                this.scene.background = new THREE.Color(0x000000); 
+                this.scene.fog = new THREE.FogExp2(0x000000, 0.02);
+
+                this.camera = new THREE.PerspectiveCamera(CONFIG.fov, window.innerWidth / window.innerHeight, 0.1, CONFIG.renderDistance);
+                this.camera.position.set(0, 2, 0);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.0;
+                this.container.appendChild(this.renderer.domElement);
+
+                // Lumières persistantes
+                this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.4);
+                this.scene.add(this.hemiLight);
+
+                this.dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+                this.dirLight.position.set(30, 80, 40);
+                this.dirLight.castShadow = true;
+                this.dirLight.shadow.mapSize.set(2048, 2048);
+                const d = 60;
+                this.dirLight.shadow.camera.left = -d;
+                this.dirLight.shadow.camera.right = d;
+                this.dirLight.shadow.camera.top = d;
+                this.dirLight.shadow.camera.bottom = -d;
+                this.scene.add(this.dirLight);
+
+                this.controls = new PointerLockControls(this.camera, document.body);
+                
+                document.addEventListener('click', () => {
+                    if (this.ready && !this.controls.isLocked) {
+                        this.controls.lock();
+                    } else if (this.ready && this.controls.isLocked) {
+                        this.interactionPulse();
+                    }
+                });
+
+                this.controls.addEventListener('lock', () => {
+                    document.getElementById('ui-layer').style.opacity = '1';
+                    document.getElementById('start-screen').style.display = 'none';
+                    document.getElementById('cycle-screen').style.display = 'none';
+                });
+
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+
+            clearLevel() {
+                // Nettoyage Physique et Graphique
+                this.levelObjects.forEach(obj => {
+                    if(obj.mesh) {
+                        this.scene.remove(obj.mesh);
+                        if(obj.mesh.geometry) obj.mesh.geometry.dispose();
+                        // Note: Material est partagé, on ne le dispose pas ici
+                    }
+                    if(obj.body) {
+                        this.physicsWorld.removeRigidBody(obj.body);
+                    }
+                });
+                
+                // Nettoyage Joueur
+                if(this.characterBody) {
+                    this.physicsWorld.removeRigidBody(this.characterBody);
+                    this.characterBody = null;
+                }
+
+                this.levelObjects = [];
+                this.sockets = [];
+                this.cores = [];
+                this.score = 0;
+                
+                // Reset UI
+                document.getElementById('objective-fill').style.width = `0%`;
+                document.getElementById('objective-count').innerText = `NOYAUX: 0/${this.maxScore}`;
+                document.getElementById('success-message').classList.remove('visible');
+            }
+
+            loadCycle(cycleIndex) {
+                this.ready = false;
+                this.clearLevel();
+                
+                const palette = CYCLES_PALETTES[cycleIndex - 1];
+                this.architect.setPalette(palette);
+                
+                // Application de l'ambiance
+                this.scene.background = new THREE.Color(palette.fog);
+                this.scene.fog.color.setHex(palette.fog);
+                this.dirLight.color.setHex(palette.light);
+                this.hemiLight.color.setHex(palette.light);
+                
+                // UI Update
+                document.documentElement.style.setProperty('--color-energy', '#' + palette.accent.toString(16).padStart(6, '0'));
+                document.getElementById('cycle-display').innerText = `${cycleIndex} / ${CONFIG.maxCycles}`;
+                
+                this.buildGeometry(cycleIndex);
+                this.initPlayer();
+                
+                this.ready = true;
+            }
+
+            buildGeometry(cycle) {
+                // 1. Sol Commun
+                const floorGeo = new THREE.BoxGeometry(120, 1, 120);
+                const floorMesh = new THREE.Mesh(floorGeo, this.architect.materials.concrete);
+                floorMesh.position.y = -0.5;
+                floorMesh.receiveShadow = true;
+                this.scene.add(floorMesh);
+                const floorBody = this.physicsWorld.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0));
+                this.physicsWorld.createCollider(RAPIER.ColliderDesc.cuboid(60, 0.5, 60), floorBody);
+                this.levelObjects.push({ mesh: floorMesh, body: floorBody });
+
+                // Helper création mur
+                const createWall = (x, z, w, h, d) => {
+                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this.architect.materials.concrete);
+                    mesh.position.set(x, h/2, z);
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    this.scene.add(mesh);
+                    const body = this.physicsWorld.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x, h/2, z));
+                    this.physicsWorld.createCollider(RAPIER.ColliderDesc.cuboid(w/2, h/2, d/2), body);
+                    this.levelObjects.push({ mesh, body });
+                };
+
+                // Enceinte Extérieure
+                createWall(0, -60, 120, 20, 5);
+                createWall(0, 60, 120, 20, 5);
+                createWall(-60, 0, 5, 20, 120);
+                createWall(60, 0, 5, 20, 120);
+
+                // --- GÉNÉRATION PROCÉDURALE PAR CYCLE ---
+                
+                // Murs Intérieurs aléatoires (Complexité croissante)
+                // Cycle 1 = Vide (Tuto)
+                // Cycle 7 = Labyrinthe dense
+                if (cycle > 1) {
+                    const density = (cycle - 1) * 4; // Nombre de murs internes
+                    for(let i=0; i<density; i++) {
+                        const x = (Math.random() - 0.5) * 80;
+                        const z = (Math.random() - 0.5) * 80;
+                        // On évite le centre (0,0) pour ne pas bloquer le start
+                        if (Math.abs(x) < 10 && Math.abs(z) < 10) continue;
+                        
+                        const w = Math.random() > 0.5 ? 20 : 2;
+                        const d = w === 20 ? 2 : 20;
+                        createWall(x, z, w, 8 + Math.random()*10, d);
+                    }
+                }
+
+                // Sockets & Cores
+                // Plus le cycle est élevé, plus ils sont loin ou cachés par les murs générés
+                // On utilise un placement aléatoire sécurisé
+                for(let i=0; i<3; i++) {
+                    // Socket Pos
+                    const angle = (i / 3) * Math.PI * 2;
+                    const radius = 20 + (cycle * 5); // S'éloigne à chaque cycle
+                    const sx = Math.cos(angle) * Math.min(radius, 50); // Max 50 pour rester dans l'arène
+                    const sz = Math.sin(angle) * Math.min(radius, 50);
+                    
+                    // Socket Mesh
+                    const sMesh = this.architect.createSocketMesh();
+                    sMesh.position.set(sx, 0.1, sz);
+                    this.scene.add(sMesh);
+                    
+                    // Beam
+                    const beamGeo = new THREE.ConeGeometry(2, 20, 32, 1, true);
+                    const beamMat = new THREE.MeshBasicMaterial({ 
+                        color: this.architect.materials.accentColor, 
+                        transparent: true, opacity: 0.05, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
+                    });
+                    const beam = new THREE.Mesh(beamGeo, beamMat);
+                    beam.position.set(sx, 10, sz);
+                    this.scene.add(beam);
+                    
+                    this.sockets.push({ mesh: sMesh, beam, pos: new THREE.Vector3(sx, 1, sz), active: false, idx: i });
+                    this.levelObjects.push({ mesh: sMesh, body: null }); // Pas de physique pour le socket visuel, mais cleanup nécessaire
+                    this.levelObjects.push({ mesh: beam, body: null });
+
+                    // Core Pos (Aléatoire loin du socket)
+                    const cx = (Math.random() - 0.5) * 80;
+                    const cz = (Math.random() - 0.5) * 80;
+                    
+                    const cMesh = this.architect.createCoreMesh();
+                    cMesh.position.set(cx, 5, cz);
+                    this.scene.add(cMesh);
+                    
+                    const cBodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(cx, 5, cz).setLinearDamping(0.8).setAngularDamping(0.8);
+                    const cBody = this.physicsWorld.createRigidBody(cBodyDesc);
+                    this.physicsWorld.createCollider(RAPIER.ColliderDesc.cuboid(0.75, 0.75, 0.75).setRestitution(0.2).setFriction(1.0).setDensity(2.0), cBody);
+                    
+                    this.cores.push({ mesh: cMesh, body: cBody, id: i, locked: false });
+                    this.levelObjects.push({ mesh: cMesh, body: cBody });
+                }
+            }
+
+            initPlayer() {
+                const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 2, 0);
+                this.characterBody = this.physicsWorld.createRigidBody(bodyDesc);
+                this.physicsWorld.createCollider(RAPIER.ColliderDesc.capsule(0.5, 0.5), this.characterBody);
+                this.camera.position.set(0, 2, 0); // Reset cam logic handled in update
+                this.verticalVelocity = 0;
+            }
+
+            interactionPulse() {
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                const interactables = this.cores.map(c => c.mesh);
+                const intersects = this.raycaster.intersectObjects(interactables);
+
+                const reticle = document.getElementById('reticle');
+                reticle.classList.add('active');
+                setTimeout(() => reticle.classList.remove('active'), 150);
+                this.audio.triggerPulse();
+
+                if(intersects.length > 0) {
+                    const hitObj = intersects[0].object;
+                    const core = this.cores.find(c => c.mesh === hitObj || c.mesh === hitObj.parent);
+                    if(core && !core.locked) {
+                        const camDir = new THREE.Vector3();
+                        this.camera.getWorldDirection(camDir);
+                        camDir.y = 0.4; 
+                        camDir.normalize();
+                        const force = camDir.multiplyScalar(25);
+                        core.body.applyImpulse(force, true);
+                    }
+                }
+            }
+
+            checkObjectives() {
+                this.cores.forEach(core => {
+                    if (core.locked) return;
+                    this.sockets.forEach(socket => {
+                        if (socket.active) return;
+                        const dist = core.mesh.position.distanceTo(socket.pos);
+                        if (dist < 2.5) {
+                            this.lockCore(core, socket);
+                        }
+                    });
+                });
+            }
+
+            lockCore(core, socket) {
+                core.locked = true;
+                socket.active = true;
+                this.score++;
+
+                core.body.setBodyType(RAPIER.RigidBodyType.Fixed);
+                core.body.setTranslation(socket.pos.x, socket.pos.y, socket.pos.z, true);
+                core.body.setRotation({x:0, y:0, z:0, w:1}, true);
+                
+                core.mesh.position.copy(socket.pos);
+                core.mesh.rotation.set(0,0,0);
+                core.mesh.material.color.setHex(CONFIG.colors.success);
+                core.mesh.material.emissive.setHex(CONFIG.colors.success);
+                
+                socket.beam.material.color.setHex(CONFIG.colors.success);
+                socket.beam.material.opacity = 0.3;
+                
+                this.audio.triggerSuccess();
+                this.updateUI();
+
+                if(this.score >= this.maxScore) {
+                    this.completeCycle();
+                }
+            }
+
+            completeCycle() {
+                if (this.currentCycle < CONFIG.maxCycles) {
+                    // Transition vers cycle suivant
+                    this.audio.triggerCycleComplete();
+                    const screen = document.getElementById('cycle-screen');
+                    screen.style.display = 'flex';
+                    screen.style.opacity = '1';
+                    
+                    setTimeout(() => {
+                        this.currentCycle++;
+                        this.loadCycle(this.currentCycle);
+                        
+                        // Masquer l'écran après chargement
+                        setTimeout(() => {
+                            screen.style.opacity = '0';
+                            setTimeout(() => screen.style.display = 'none', 1000);
+                        }, 500);
+                    }, 3000);
+                } else {
+                    this.triggerWin();
+                }
+            }
+
+            triggerWin() {
+                document.getElementById('success-message').classList.add('visible');
+                // Écran blanc final
+                this.scene.background = new THREE.Color(0xffffff);
+                this.scene.fog.color.setHex(0xffffff);
+            }
+
+            updateUI() {
+                const pct = (this.score / this.maxScore) * 100;
+                document.getElementById('objective-fill').style.width = `${pct}%`;
+                document.getElementById('objective-count').innerText = `NOYAUX: ${this.score}/${this.maxScore}`;
+            }
+
+            updateReticle() {
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                const interactables = this.cores.map(c => c.mesh);
+                const intersects = this.raycaster.intersectObjects(interactables);
+                const reticle = document.getElementById('reticle');
+                
+                // Reset basic
+                reticle.classList.remove('hover');
+
+                if(intersects.length > 0) {
+                     const core = this.cores.find(c => c.mesh === intersects[0].object || c.mesh === intersects[0].object.parent);
+                     if(core && !core.locked) {
+                        reticle.classList.add('hover');
+                     }
+                }
+            }
+
+            updatePlayer(dt) {
+                if(!this.controls.isLocked) return;
+                const speed = CONFIG.playerSpeed * dt;
+                const velocity = new THREE.Vector3();
+                if (this.keys['KeyW'] || this.keys['ArrowUp']) velocity.z -= speed;
+                if (this.keys['KeyS'] || this.keys['ArrowDown']) velocity.z += speed;
+                if (this.keys['KeyA'] || this.keys['ArrowLeft']) velocity.x -= speed;
+                if (this.keys['KeyD'] || this.keys['ArrowRight']) velocity.x += speed;
+                velocity.applyEuler(new THREE.Euler(0, this.camera.rotation.y, 0));
+
+                const currentPos = this.characterBody.translation();
+                this.verticalVelocity -= 50.0 * dt; 
+                if (currentPos.y <= 1.0 && this.verticalVelocity <= 0) {
+                    this.verticalVelocity = 0;
+                    currentPos.y = 1.0;
+                    this.canJump = true;
+                } else {
+                    this.canJump = false;
+                }
+                if (this.keys['Space'] && this.canJump) {
+                    this.verticalVelocity = CONFIG.playerJump;
+                    this.canJump = false;
+                }
+                let newY = currentPos.y + this.verticalVelocity * dt;
+                if (newY < 1.0) { newY = 1.0; this.verticalVelocity = 0; this.canJump = true; }
+
+                const nextPos = { x: currentPos.x + velocity.x, y: newY, z: currentPos.z + velocity.z };
+                this.characterBody.setNextKinematicTranslation(nextPos);
+                this.camera.position.set(nextPos.x, nextPos.y + 0.8, nextPos.z);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                const dt = this.clock.getDelta();
+                if (this.ready) {
+                    this.physicsWorld.step();
+                    this.cores.forEach(c => {
+                        if(!c.locked) {
+                            const pos = c.body.translation();
+                            const rot = c.body.rotation();
+                            c.mesh.position.set(pos.x, pos.y, pos.z);
+                            c.mesh.quaternion.set(rot.x, rot.y, rot.z, rot.w);
+                        }
+                    });
+                    this.checkObjectives();
+                    this.updatePlayer(dt);
+                    this.updateReticle();
+                }
+                this.renderer.render(this.scene, this.camera);
+            }
+
+            async start() {
+                document.getElementById('start-screen').querySelector('p').innerText = "INITIALISATION DES CYCLES...";
+                this.keys = {};
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.code] = true;
+                    if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+                });
+                document.addEventListener('keyup', (e) => this.keys[e.code] = false);
+
+                await this.initPhysics();
+                this.initGraphics();
+                await this.audio.init();
+                
+                // Lancer le premier cycle
+                this.loadCycle(1);
+
+                document.getElementById('start-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('start-screen').style.display = 'none';
+                    this.controls.lock(); 
+                }, 1000);
+
+                this.animate();
+            }
+        }
+
+        const app = new App();
+        window.app = app;
+        
+        document.getElementById('start-screen').addEventListener('click', () => { app.start(); });
+    </script>
+</body>
+</html>
