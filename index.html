@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AETHERIS ARCHITECT | Build 2026.2.0 (Cycles)</title>
+    <title>AETHERIS ARCHITECT | Build 2026.2.1 (Stability Patch)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -226,28 +226,28 @@
         const CONFIG = {
             fov: 80,
             renderDistance: 200,
-            playerSpeed: 12.0,
-            playerJump: 18.0,
+            playerSpeed: 10.0, // Vitesse ajustée pour le nouveau contrôleur
+            playerJump: 12.0,
             gravity: { x: 0.0, y: -25.0, z: 0.0 },
             maxCycles: 7
         };
 
         // Palettes par Cycle pour ambiance progressive
-        const CYCLES_PALETTES = [
+        const CYCLES_DATA = [
             // Cycle 1: Cyan (Tuto/Calme)
-            { fog: 0x081015, light: 0xaaccff, accent: 0x00d9ff, concrete: 0x505055 },
+            { fog: 0x081015, light: 0xaaccff, accent: 0x00d9ff, concrete: 0x505055, name: "INITIATION" },
             // Cycle 2: Vert (Organique/Mystère)
-            { fog: 0x051505, light: 0xccffcc, accent: 0x00ff88, concrete: 0x445544 },
+            { fog: 0x051505, light: 0xccffcc, accent: 0x00ff88, concrete: 0x445544, name: "CROISSANCE" },
             // Cycle 3: Or (Ancien/Solennel)
-            { fog: 0x151005, light: 0xffddaa, accent: 0xffaa00, concrete: 0x555044 },
+            { fog: 0x151005, light: 0xffddaa, accent: 0xffaa00, concrete: 0x555044, name: "TEMPLE" },
             // Cycle 4: Violet (Éthéré/Rêve)
-            { fog: 0x100515, light: 0xccaaff, accent: 0xaa00ff, concrete: 0x504455 },
+            { fog: 0x100515, light: 0xccaaff, accent: 0xaa00ff, concrete: 0x504455, name: "ONIRIQUE" },
             // Cycle 5: Rouge (Alerte/Instable)
-            { fog: 0x150505, light: 0xffaaaa, accent: 0xff0044, concrete: 0x554444 },
+            { fog: 0x150505, light: 0xffaaaa, accent: 0xff0044, concrete: 0x554444, name: "ALERTE" },
             // Cycle 6: Gris Sombre (Néant/Vide)
-            { fog: 0x000000, light: 0x888888, accent: 0xffffff, concrete: 0x222222 },
+            { fog: 0x000000, light: 0x888888, accent: 0xffffff, concrete: 0x222222, name: "NÉANT" },
             // Cycle 7: Blanc Pur (Transcendance)
-            { fog: 0xeeeeee, light: 0xffffff, accent: 0x000000, concrete: 0xffffff }
+            { fog: 0xeeeeee, light: 0xffffff, accent: 0x000000, concrete: 0xffffff, name: "SINGULARITÉ" }
         ];
 
         class AudioManager {
@@ -320,7 +320,6 @@
             
             triggerCycleComplete() {
                 if(!this.initialized) return;
-                // Son plus grave et long pour la fin de cycle
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 osc.type = 'sawtooth';
@@ -329,7 +328,6 @@
                 gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 4);
                 
-                // Filtre Lowpass pour effet "sous l'eau"
                 const filter = this.ctx.createBiquadFilter();
                 filter.type = 'lowpass';
                 filter.frequency.setValueAtTime(1000, this.ctx.currentTime);
@@ -345,7 +343,7 @@
 
         class ProceduralArchitect {
             constructor() {
-                this.materials = {}; // Init vide, rempli par setPalette
+                this.materials = {}; 
             }
 
             setPalette(palette) {
@@ -408,20 +406,23 @@
                 this.architect = new ProceduralArchitect();
                 
                 this.physicsWorld = null;
-                this.levelObjects = []; // Stocke les objets à nettoyer (meshes et bodies)
+                this.characterController = null; // Contrôleur de personnage Rapier
+                this.levelObjects = []; 
                 
                 this.sockets = []; 
                 this.cores = []; 
                 this.characterBody = null;
+                this.characterCollider = null;
                 
                 this.score = 0;
-                this.maxScore = 3; // 3 cœurs par cycle
+                this.maxScore = 3; 
                 
                 this.raycaster = new THREE.Raycaster();
                 this.mouse = new THREE.Vector2(0,0);
                 
                 this.verticalVelocity = 0;
                 this.canJump = false;
+                this.keys = {};
             }
 
             async initPhysics() {
@@ -431,7 +432,6 @@
 
             initGraphics() {
                 this.scene = new THREE.Scene();
-                // Couleur init (sera écrasée par loadCycle)
                 this.scene.background = new THREE.Color(0x000000); 
                 this.scene.fog = new THREE.FogExp2(0x000000, 0.02);
 
@@ -446,7 +446,6 @@
                 this.renderer.toneMappingExposure = 1.0;
                 this.container.appendChild(this.renderer.domElement);
 
-                // Lumières persistantes
                 this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.4);
                 this.scene.add(this.hemiLight);
 
@@ -454,7 +453,7 @@
                 this.dirLight.position.set(30, 80, 40);
                 this.dirLight.castShadow = true;
                 this.dirLight.shadow.mapSize.set(2048, 2048);
-                const d = 60;
+                const d = 80;
                 this.dirLight.shadow.camera.left = -d;
                 this.dirLight.shadow.camera.right = d;
                 this.dirLight.shadow.camera.top = d;
@@ -485,22 +484,24 @@
             }
 
             clearLevel() {
-                // Nettoyage Physique et Graphique
                 this.levelObjects.forEach(obj => {
                     if(obj.mesh) {
                         this.scene.remove(obj.mesh);
                         if(obj.mesh.geometry) obj.mesh.geometry.dispose();
-                        // Note: Material est partagé, on ne le dispose pas ici
                     }
                     if(obj.body) {
                         this.physicsWorld.removeRigidBody(obj.body);
                     }
                 });
                 
-                // Nettoyage Joueur
                 if(this.characterBody) {
                     this.physicsWorld.removeRigidBody(this.characterBody);
                     this.characterBody = null;
+                }
+                
+                if(this.characterController) {
+                    this.physicsWorld.removeCharacterController(this.characterController);
+                    this.characterController = null;
                 }
 
                 this.levelObjects = [];
@@ -508,7 +509,6 @@
                 this.cores = [];
                 this.score = 0;
                 
-                // Reset UI
                 document.getElementById('objective-fill').style.width = `0%`;
                 document.getElementById('objective-count').innerText = `NOYAUX: 0/${this.maxScore}`;
                 document.getElementById('success-message').classList.remove('visible');
@@ -518,18 +518,16 @@
                 this.ready = false;
                 this.clearLevel();
                 
-                const palette = CYCLES_PALETTES[cycleIndex - 1];
-                this.architect.setPalette(palette);
+                const data = CYCLES_DATA[cycleIndex - 1];
+                this.architect.setPalette(data);
                 
-                // Application de l'ambiance
-                this.scene.background = new THREE.Color(palette.fog);
-                this.scene.fog.color.setHex(palette.fog);
-                this.dirLight.color.setHex(palette.light);
-                this.hemiLight.color.setHex(palette.light);
+                this.scene.background = new THREE.Color(data.fog);
+                this.scene.fog.color.setHex(data.fog);
+                this.dirLight.color.setHex(data.light);
+                this.hemiLight.color.setHex(data.light);
                 
-                // UI Update
-                document.documentElement.style.setProperty('--color-energy', '#' + palette.accent.toString(16).padStart(6, '0'));
-                document.getElementById('cycle-display').innerText = `${cycleIndex} / ${CONFIG.maxCycles}`;
+                document.documentElement.style.setProperty('--color-energy', '#' + data.accent.toString(16).padStart(6, '0'));
+                document.getElementById('cycle-display').innerText = `${cycleIndex} / ${CONFIG.maxCycles} - ${data.name}`;
                 
                 this.buildGeometry(cycleIndex);
                 this.initPlayer();
@@ -538,17 +536,16 @@
             }
 
             buildGeometry(cycle) {
-                // 1. Sol Commun
-                const floorGeo = new THREE.BoxGeometry(120, 1, 120);
+                // Sol Commun
+                const floorGeo = new THREE.BoxGeometry(160, 1, 160);
                 const floorMesh = new THREE.Mesh(floorGeo, this.architect.materials.concrete);
                 floorMesh.position.y = -0.5;
                 floorMesh.receiveShadow = true;
                 this.scene.add(floorMesh);
                 const floorBody = this.physicsWorld.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0));
-                this.physicsWorld.createCollider(RAPIER.ColliderDesc.cuboid(60, 0.5, 60), floorBody);
+                this.physicsWorld.createCollider(RAPIER.ColliderDesc.cuboid(80, 0.5, 80), floorBody);
                 this.levelObjects.push({ mesh: floorMesh, body: floorBody });
 
-                // Helper création mur
                 const createWall = (x, z, w, h, d) => {
                     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this.architect.materials.concrete);
                     mesh.position.set(x, h/2, z);
@@ -561,70 +558,110 @@
                 };
 
                 // Enceinte Extérieure
-                createWall(0, -60, 120, 20, 5);
-                createWall(0, 60, 120, 20, 5);
-                createWall(-60, 0, 5, 20, 120);
-                createWall(60, 0, 5, 20, 120);
+                createWall(0, -80, 160, 15, 5);
+                createWall(0, 80, 160, 15, 5);
+                createWall(-80, 0, 5, 15, 160);
+                createWall(80, 0, 5, 15, 160);
 
-                // --- GÉNÉRATION PROCÉDURALE PAR CYCLE ---
-                
-                // Murs Intérieurs aléatoires (Complexité croissante)
-                // Cycle 1 = Vide (Tuto)
-                // Cycle 7 = Labyrinthe dense
-                if (cycle > 1) {
-                    const density = (cycle - 1) * 4; // Nombre de murs internes
-                    for(let i=0; i<density; i++) {
-                        const x = (Math.random() - 0.5) * 80;
-                        const z = (Math.random() - 0.5) * 80;
-                        // On évite le centre (0,0) pour ne pas bloquer le start
-                        if (Math.abs(x) < 10 && Math.abs(z) < 10) continue;
-                        
-                        const w = Math.random() > 0.5 ? 20 : 2;
-                        const d = w === 20 ? 2 : 20;
-                        createWall(x, z, w, 8 + Math.random()*10, d);
+                // --- GÉNÉRATION DE NIVEAUX SPÉCIFIQUES ---
+                let spawnPoints = [];
+                let socketPoints = [];
+
+                if (cycle === 1) {
+                    // Tuto: Espace ouvert
+                    socketPoints = [{x: 10, z: 0}, {x: -10, z: 10}, {x: -10, z: -10}];
+                    spawnPoints = [{x: 20, z: 0}, {x: -20, z: 20}, {x: -20, z: -20}];
+                } 
+                else if (cycle === 2) {
+                    // Piliers: Quelques obstacles centraux
+                    createWall(20, 20, 10, 8, 10);
+                    createWall(-20, -20, 10, 8, 10);
+                    createWall(20, -20, 10, 8, 10);
+                    createWall(-20, 20, 10, 8, 10);
+                    socketPoints = [{x: 0, z: 0}, {x: 40, z: 0}, {x: -40, z: 0}];
+                    spawnPoints = [{x: 0, z: 30}, {x: 40, z: 30}, {x: -40, z: 30}];
+                }
+                else if (cycle === 3) {
+                    // Temple: Allée centrale
+                    createWall(-15, 0, 5, 6, 80);
+                    createWall(15, 0, 5, 6, 80);
+                    socketPoints = [{x: 0, z: 60}, {x: -30, z: 0}, {x: 30, z: 0}];
+                    spawnPoints = [{x: 0, z: -40}, {x: -30, z: 20}, {x: 30, z: 20}];
+                }
+                else if (cycle === 4) {
+                    // Labyrinthe Simple
+                    for(let i=-2; i<=2; i++) {
+                        createWall(i*20, 10, 2, 6, 30);
+                        createWall(30, i*20, 30, 6, 2);
                     }
+                    socketPoints = [{x: 50, z: 50}, {x: -50, z: -50}, {x: 50, z: -50}];
+                    spawnPoints = [{x: 0, z: 0}, {x: 10, z: 10}, {x: -10, z: -10}];
+                }
+                else if (cycle === 5) {
+                    // Hauteurs: Plateformes (nécessite de sauter ou pousser)
+                    // Plateforme centrale
+                    createWall(0, 0, 20, 4, 20); // Hauteur 4, accessible en sautant
+                    // Murs hauts autour
+                    createWall(40, 0, 5, 12, 40);
+                    createWall(-40, 0, 5, 12, 40);
+                    socketPoints = [{x: 0, z: 0}, {x: 50, z: 0}, {x: -50, z: 0}]; // Un sur la plateforme
+                    spawnPoints = [{x: 20, z: 20}, {x: -20, z: -20}, {x: 0, z: 50}];
+                }
+                else if (cycle === 6) {
+                    // Claustrophobie: Beaucoup de murs
+                    for(let i=0; i<20; i++) {
+                        const x = (Math.random()-0.5)*120;
+                        const z = (Math.random()-0.5)*120;
+                        createWall(x, z, 5 + Math.random()*15, 10, 5 + Math.random()*15);
+                    }
+                    socketPoints = [{x: 60, z: 60}, {x: -60, z: -60}, {x: 60, z: -60}];
+                    spawnPoints = [{x: 0, z: 0}, {x: 10, z: 0}, {x: -10, z: 0}];
+                }
+                else {
+                    // Cycle 7: Le Vide (Rien à part le but)
+                    socketPoints = [{x: 0, z: 20}, {x: 20, z: -20}, {x: -20, z: -20}];
+                    spawnPoints = [{x: 0, z: 0}, {x: 0, z: 0}, {x: 0, z: 0}];
                 }
 
-                // Sockets & Cores
-                // Plus le cycle est élevé, plus ils sont loin ou cachés par les murs générés
-                // On utilise un placement aléatoire sécurisé
+                // Génération des Sockets et Cores basés sur les points
                 for(let i=0; i<3; i++) {
-                    // Socket Pos
-                    const angle = (i / 3) * Math.PI * 2;
-                    const radius = 20 + (cycle * 5); // S'éloigne à chaque cycle
-                    const sx = Math.cos(angle) * Math.min(radius, 50); // Max 50 pour rester dans l'arène
-                    const sz = Math.sin(angle) * Math.min(radius, 50);
+                    const sp = socketPoints[i] || {x: i*10, z: 0};
                     
-                    // Socket Mesh
                     const sMesh = this.architect.createSocketMesh();
-                    sMesh.position.set(sx, 0.1, sz);
+                    sMesh.position.set(sp.x, 0.1, sp.z);
                     this.scene.add(sMesh);
                     
-                    // Beam
-                    const beamGeo = new THREE.ConeGeometry(2, 20, 32, 1, true);
+                    const beamGeo = new THREE.ConeGeometry(2, 40, 32, 1, true);
                     const beamMat = new THREE.MeshBasicMaterial({ 
                         color: this.architect.materials.accentColor, 
                         transparent: true, opacity: 0.05, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
                     });
                     const beam = new THREE.Mesh(beamGeo, beamMat);
-                    beam.position.set(sx, 10, sz);
+                    beam.position.set(sp.x, 20, sp.z);
                     this.scene.add(beam);
                     
-                    this.sockets.push({ mesh: sMesh, beam, pos: new THREE.Vector3(sx, 1, sz), active: false, idx: i });
-                    this.levelObjects.push({ mesh: sMesh, body: null }); // Pas de physique pour le socket visuel, mais cleanup nécessaire
+                    this.sockets.push({ mesh: sMesh, beam, pos: new THREE.Vector3(sp.x, 1, sp.z), active: false, idx: i });
+                    this.levelObjects.push({ mesh: sMesh, body: null });
                     this.levelObjects.push({ mesh: beam, body: null });
 
-                    // Core Pos (Aléatoire loin du socket)
-                    const cx = (Math.random() - 0.5) * 80;
-                    const cz = (Math.random() - 0.5) * 80;
+                    // Core Pos
+                    const cp = spawnPoints[i] || {x: 0, z: 0};
                     
                     const cMesh = this.architect.createCoreMesh();
-                    cMesh.position.set(cx, 5, cz);
+                    cMesh.position.set(cp.x, 5, cp.z);
                     this.scene.add(cMesh);
                     
-                    const cBodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(cx, 5, cz).setLinearDamping(0.8).setAngularDamping(0.8);
+                    // Core physique
+                    const cBodyDesc = RAPIER.RigidBodyDesc.dynamic()
+                        .setTranslation(cp.x, 5, cp.z)
+                        .setLinearDamping(0.8)
+                        .setAngularDamping(0.8);
                     const cBody = this.physicsWorld.createRigidBody(cBodyDesc);
-                    this.physicsWorld.createCollider(RAPIER.ColliderDesc.cuboid(0.75, 0.75, 0.75).setRestitution(0.2).setFriction(1.0).setDensity(2.0), cBody);
+                    const cCollider = RAPIER.ColliderDesc.cuboid(0.75, 0.75, 0.75)
+                        .setRestitution(0.2)
+                        .setFriction(1.0)
+                        .setDensity(2.0);
+                    this.physicsWorld.createCollider(cCollider, cBody);
                     
                     this.cores.push({ mesh: cMesh, body: cBody, id: i, locked: false });
                     this.levelObjects.push({ mesh: cMesh, body: cBody });
@@ -632,10 +669,19 @@
             }
 
             initPlayer() {
-                const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 2, 0);
+                // Utilisation du Character Controller de Rapier pour corriger les bugs de déplacement
+                const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 5, 0);
                 this.characterBody = this.physicsWorld.createRigidBody(bodyDesc);
-                this.physicsWorld.createCollider(RAPIER.ColliderDesc.capsule(0.5, 0.5), this.characterBody);
-                this.camera.position.set(0, 2, 0); // Reset cam logic handled in update
+                
+                const colliderDesc = RAPIER.ColliderDesc.capsule(0.5, 0.5).setTranslation(0, 0, 0);
+                this.characterCollider = this.physicsWorld.createCollider(colliderDesc, this.characterBody);
+
+                const offset = 0.1;
+                this.characterController = this.physicsWorld.createCharacterController(offset);
+                this.characterController.enableAutostep(0.7, 0.3, true); // Permet de monter des petites marches
+                this.characterController.enableSnapToGround(0.5); // Colle au sol
+
+                this.camera.position.set(0, 2, 0);
                 this.verticalVelocity = 0;
             }
 
@@ -657,8 +703,9 @@
                         this.camera.getWorldDirection(camDir);
                         camDir.y = 0.4; 
                         camDir.normalize();
-                        const force = camDir.multiplyScalar(25);
+                        const force = camDir.multiplyScalar(25); // Force de poussée
                         core.body.applyImpulse(force, true);
+                        core.body.setAngvel({x: Math.random(), y: Math.random(), z: Math.random()}, true); // Petit effet de rotation
                     }
                 }
             }
@@ -684,13 +731,16 @@
                 core.body.setBodyType(RAPIER.RigidBodyType.Fixed);
                 core.body.setTranslation(socket.pos.x, socket.pos.y, socket.pos.z, true);
                 core.body.setRotation({x:0, y:0, z:0, w:1}, true);
+                // Important: Réinitialiser la vélocité pour éviter les fantômes
+                core.body.setLinvel({x:0, y:0, z:0}, true);
+                core.body.setAngvel({x:0, y:0, z:0}, true);
                 
                 core.mesh.position.copy(socket.pos);
                 core.mesh.rotation.set(0,0,0);
-                core.mesh.material.color.setHex(CONFIG.colors.success);
-                core.mesh.material.emissive.setHex(CONFIG.colors.success);
+                core.mesh.material.color.setHex(CONFIG.colors?.success || 0x00ffaa);
+                core.mesh.material.emissive.setHex(CONFIG.colors?.success || 0x00ffaa);
                 
-                socket.beam.material.color.setHex(CONFIG.colors.success);
+                socket.beam.material.color.setHex(CONFIG.colors?.success || 0x00ffaa);
                 socket.beam.material.opacity = 0.3;
                 
                 this.audio.triggerSuccess();
@@ -703,7 +753,6 @@
 
             completeCycle() {
                 if (this.currentCycle < CONFIG.maxCycles) {
-                    // Transition vers cycle suivant
                     this.audio.triggerCycleComplete();
                     const screen = document.getElementById('cycle-screen');
                     screen.style.display = 'flex';
@@ -713,7 +762,6 @@
                         this.currentCycle++;
                         this.loadCycle(this.currentCycle);
                         
-                        // Masquer l'écran après chargement
                         setTimeout(() => {
                             screen.style.opacity = '0';
                             setTimeout(() => screen.style.display = 'none', 1000);
@@ -726,7 +774,6 @@
 
             triggerWin() {
                 document.getElementById('success-message').classList.add('visible');
-                // Écran blanc final
                 this.scene.background = new THREE.Color(0xffffff);
                 this.scene.fog.color.setHex(0xffffff);
             }
@@ -743,7 +790,6 @@
                 const intersects = this.raycaster.intersectObjects(interactables);
                 const reticle = document.getElementById('reticle');
                 
-                // Reset basic
                 reticle.classList.remove('hover');
 
                 if(intersects.length > 0) {
@@ -756,40 +802,83 @@
 
             updatePlayer(dt) {
                 if(!this.controls.isLocked) return;
-                const speed = CONFIG.playerSpeed * dt;
-                const velocity = new THREE.Vector3();
-                if (this.keys['KeyW'] || this.keys['ArrowUp']) velocity.z -= speed;
-                if (this.keys['KeyS'] || this.keys['ArrowDown']) velocity.z += speed;
-                if (this.keys['KeyA'] || this.keys['ArrowLeft']) velocity.x -= speed;
-                if (this.keys['KeyD'] || this.keys['ArrowRight']) velocity.x += speed;
-                velocity.applyEuler(new THREE.Euler(0, this.camera.rotation.y, 0));
 
-                const currentPos = this.characterBody.translation();
-                this.verticalVelocity -= 50.0 * dt; 
-                if (currentPos.y <= 1.0 && this.verticalVelocity <= 0) {
-                    this.verticalVelocity = 0;
-                    currentPos.y = 1.0;
+                // --- CORRECTION SENIOR: Gestion Vectorielle Robuste ---
+                
+                // 1. Récupérer la direction "Avant" de la caméra
+                const forward = new THREE.Vector3();
+                this.camera.getWorldDirection(forward);
+                forward.y = 0; // On aplatit sur le plan Y pour ne pas voler/s'enfoncer en regardant haut/bas
+                forward.normalize();
+
+                // 2. Calculer la direction "Droite" (Produit vectoriel avec l'axe Y Haut)
+                const right = new THREE.Vector3();
+                right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize(); // Inversion du produit pour avoir la droite correcte
+                // Note: ThreeJS est Right-Handed, parfois il faut cross(Up, Forward) ou cross(Forward, Up) selon le sens.
+                // Standard: Forward (Z-) x Up (Y+) = Right (X+) -> crossVectors(forward, up) est souvent Left. 
+                // Correction Senior: On utilise crossVectors(this.camera.up, forward) pour Left, ou inversement.
+                // Simplification sûre:
+                right.crossVectors(forward, this.camera.up).negate(); // Pour être sûr d'avoir la droite
+
+                const moveVector = new THREE.Vector3(0, 0, 0);
+
+                // 3. Application des Inputs (Flèches et ZQSD unifiés)
+                // Avant/Arrière
+                if (this.keys['KeyW'] || this.keys['ArrowUp']) moveVector.add(forward);
+                if (this.keys['KeyS'] || this.keys['ArrowDown']) moveVector.sub(forward);
+                
+                // Gauche/Droite (Strafe)
+                if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveVector.sub(right);
+                if (this.keys['KeyD'] || this.keys['ArrowRight']) moveVector.add(right);
+
+                // Normalisation pour éviter d'aller plus vite en diagonale
+                if (moveVector.lengthSq() > 0) {
+                    moveVector.normalize().multiplyScalar(CONFIG.playerSpeed * dt);
+                }
+
+                // 4. Gestion de la gravité (inchangée, elle était correcte)
+                const grounded = this.characterController.computedGrounded();
+                
+                if (grounded) {
+                    this.verticalVelocity = -5.0; 
                     this.canJump = true;
                 } else {
+                    this.verticalVelocity += CONFIG.gravity.y * dt * 2.5; 
                     this.canJump = false;
                 }
-                if (this.keys['Space'] && this.canJump) {
-                    this.verticalVelocity = CONFIG.playerJump;
-                    this.canJump = false;
-                }
-                let newY = currentPos.y + this.verticalVelocity * dt;
-                if (newY < 1.0) { newY = 1.0; this.verticalVelocity = 0; this.canJump = true; }
 
-                const nextPos = { x: currentPos.x + velocity.x, y: newY, z: currentPos.z + velocity.z };
-                this.characterBody.setNextKinematicTranslation(nextPos);
-                this.camera.position.set(nextPos.x, nextPos.y + 0.8, nextPos.z);
+                if (this.keys['Space'] && grounded) {
+                    this.verticalVelocity = CONFIG.playerJump;
+                }
+
+                // Application de la vélocité verticale au vecteur final
+                moveVector.y = this.verticalVelocity * dt;
+
+                // 5. Envoi au moteur physique
+                this.characterController.computeColliderMovement(
+                    this.characterCollider,
+                    moveVector
+                );
+
+                const correctedMovement = this.characterController.computedMovement();
+                const currentPos = this.characterBody.translation();
+                const newPos = {
+                    x: currentPos.x + correctedMovement.x,
+                    y: currentPos.y + correctedMovement.y,
+                    z: currentPos.z + correctedMovement.z
+                };
+
+                this.characterBody.setNextKinematicTranslation(newPos);
+                this.camera.position.set(newPos.x, newPos.y + 0.8, newPos.z);
             }
 
             animate() {
                 requestAnimationFrame(() => this.animate());
-                const dt = this.clock.getDelta();
+                const dt = Math.min(this.clock.getDelta(), 0.1); // Cap dt pour éviter les sauts énormes
+                
                 if (this.ready) {
                     this.physicsWorld.step();
+                    
                     this.cores.forEach(c => {
                         if(!c.locked) {
                             const pos = c.body.translation();
@@ -798,6 +887,7 @@
                             c.mesh.quaternion.set(rot.x, rot.y, rot.z, rot.w);
                         }
                     });
+                    
                     this.checkObjectives();
                     this.updatePlayer(dt);
                     this.updateReticle();
@@ -806,12 +896,18 @@
             }
 
             async start() {
-                document.getElementById('start-screen').querySelector('p').innerText = "INITIALISATION DES CYCLES...";
+                document.getElementById('start-screen').querySelector('p').innerText = "INITIALISATION DES SYSTÈMES...";
                 this.keys = {};
+                
+                // --- CORRECTION SENIOR: Gestion des événements clavier ---
+                // On empêche le navigateur de scroller quand on joue avec les flèches
                 document.addEventListener('keydown', (e) => {
                     this.keys[e.code] = true;
-                    if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+                    if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+                        e.preventDefault();
+                    }
                 });
+                
                 document.addEventListener('keyup', (e) => this.keys[e.code] = false);
 
                 await this.initPhysics();
