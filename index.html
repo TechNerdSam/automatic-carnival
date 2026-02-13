@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AETHERIS ARCHITECT | Build 2026.2.1 (Stability Patch)</title>
+    <title>AETHERIS ARCHITECT | Build 2026.2.2 </title>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -27,6 +27,7 @@
             overflow: hidden;
             font-family: 'Inter', sans-serif;
             cursor: none;
+            user-select: none; /* Empêche la sélection de texte accidentelle */
         }
 
         #ui-layer {
@@ -220,33 +221,24 @@
     <script type="module">
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-        import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
         import RAPIER from '@dimforge/rapier3d-compat';
         
         const CONFIG = {
             fov: 80,
             renderDistance: 200,
-            playerSpeed: 10.0, // Vitesse ajustée pour le nouveau contrôleur
-            playerJump: 12.0,
+            playerSpeed: 10.0,
+            playerJump: 15.0, // Saut légèrement augmenté pour meilleure sensation
             gravity: { x: 0.0, y: -25.0, z: 0.0 },
             maxCycles: 7
         };
 
-        // Palettes par Cycle pour ambiance progressive
         const CYCLES_DATA = [
-            // Cycle 1: Cyan (Tuto/Calme)
             { fog: 0x081015, light: 0xaaccff, accent: 0x00d9ff, concrete: 0x505055, name: "INITIATION" },
-            // Cycle 2: Vert (Organique/Mystère)
             { fog: 0x051505, light: 0xccffcc, accent: 0x00ff88, concrete: 0x445544, name: "CROISSANCE" },
-            // Cycle 3: Or (Ancien/Solennel)
             { fog: 0x151005, light: 0xffddaa, accent: 0xffaa00, concrete: 0x555044, name: "TEMPLE" },
-            // Cycle 4: Violet (Éthéré/Rêve)
             { fog: 0x100515, light: 0xccaaff, accent: 0xaa00ff, concrete: 0x504455, name: "ONIRIQUE" },
-            // Cycle 5: Rouge (Alerte/Instable)
             { fog: 0x150505, light: 0xffaaaa, accent: 0xff0044, concrete: 0x554444, name: "ALERTE" },
-            // Cycle 6: Gris Sombre (Néant/Vide)
             { fog: 0x000000, light: 0x888888, accent: 0xffffff, concrete: 0x222222, name: "NÉANT" },
-            // Cycle 7: Blanc Pur (Transcendance)
             { fog: 0xeeeeee, light: 0xffffff, accent: 0x000000, concrete: 0xffffff, name: "SINGULARITÉ" }
         ];
 
@@ -262,7 +254,6 @@
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 this.ctx = new AudioContext();
                 
-                // Ambiance de fond
                 const bufferSize = 2 * this.ctx.sampleRate;
                 const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                 const output = noiseBuffer.getChannelData(0);
@@ -406,7 +397,7 @@
                 this.architect = new ProceduralArchitect();
                 
                 this.physicsWorld = null;
-                this.characterController = null; // Contrôleur de personnage Rapier
+                this.characterController = null; 
                 this.levelObjects = []; 
                 
                 this.sockets = []; 
@@ -422,7 +413,12 @@
                 
                 this.verticalVelocity = 0;
                 this.canJump = false;
-                this.keys = {};
+                
+                // Correction Senior: Reset des touches au démarrage
+                this.keys = {
+                    ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
+                    KeyW: false, KeyS: false, KeyA: false, KeyD: false, Space: false
+                };
             }
 
             async initPhysics() {
@@ -474,6 +470,8 @@
                     document.getElementById('ui-layer').style.opacity = '1';
                     document.getElementById('start-screen').style.display = 'none';
                     document.getElementById('cycle-screen').style.display = 'none';
+                    // Reset inputs on lock to prevent ghost walking
+                    this.resetKeys();
                 });
 
                 window.addEventListener('resize', () => {
@@ -481,6 +479,13 @@
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
                 });
+
+                // Correction Senior: Reset des touches si on perd le focus
+                window.addEventListener('blur', () => this.resetKeys());
+            }
+
+            resetKeys() {
+                for(let k in this.keys) this.keys[k] = false;
             }
 
             clearLevel() {
@@ -536,7 +541,6 @@
             }
 
             buildGeometry(cycle) {
-                // Sol Commun
                 const floorGeo = new THREE.BoxGeometry(160, 1, 160);
                 const floorMesh = new THREE.Mesh(floorGeo, this.architect.materials.concrete);
                 floorMesh.position.y = -0.5;
@@ -557,23 +561,19 @@
                     this.levelObjects.push({ mesh, body });
                 };
 
-                // Enceinte Extérieure
                 createWall(0, -80, 160, 15, 5);
                 createWall(0, 80, 160, 15, 5);
                 createWall(-80, 0, 5, 15, 160);
                 createWall(80, 0, 5, 15, 160);
 
-                // --- GÉNÉRATION DE NIVEAUX SPÉCIFIQUES ---
                 let spawnPoints = [];
                 let socketPoints = [];
 
                 if (cycle === 1) {
-                    // Tuto: Espace ouvert
                     socketPoints = [{x: 10, z: 0}, {x: -10, z: 10}, {x: -10, z: -10}];
                     spawnPoints = [{x: 20, z: 0}, {x: -20, z: 20}, {x: -20, z: -20}];
                 } 
                 else if (cycle === 2) {
-                    // Piliers: Quelques obstacles centraux
                     createWall(20, 20, 10, 8, 10);
                     createWall(-20, -20, 10, 8, 10);
                     createWall(20, -20, 10, 8, 10);
@@ -582,14 +582,12 @@
                     spawnPoints = [{x: 0, z: 30}, {x: 40, z: 30}, {x: -40, z: 30}];
                 }
                 else if (cycle === 3) {
-                    // Temple: Allée centrale
                     createWall(-15, 0, 5, 6, 80);
                     createWall(15, 0, 5, 6, 80);
                     socketPoints = [{x: 0, z: 60}, {x: -30, z: 0}, {x: 30, z: 0}];
                     spawnPoints = [{x: 0, z: -40}, {x: -30, z: 20}, {x: 30, z: 20}];
                 }
                 else if (cycle === 4) {
-                    // Labyrinthe Simple
                     for(let i=-2; i<=2; i++) {
                         createWall(i*20, 10, 2, 6, 30);
                         createWall(30, i*20, 30, 6, 2);
@@ -598,17 +596,13 @@
                     spawnPoints = [{x: 0, z: 0}, {x: 10, z: 10}, {x: -10, z: -10}];
                 }
                 else if (cycle === 5) {
-                    // Hauteurs: Plateformes (nécessite de sauter ou pousser)
-                    // Plateforme centrale
-                    createWall(0, 0, 20, 4, 20); // Hauteur 4, accessible en sautant
-                    // Murs hauts autour
+                    createWall(0, 0, 20, 4, 20); 
                     createWall(40, 0, 5, 12, 40);
                     createWall(-40, 0, 5, 12, 40);
-                    socketPoints = [{x: 0, z: 0}, {x: 50, z: 0}, {x: -50, z: 0}]; // Un sur la plateforme
+                    socketPoints = [{x: 0, z: 0}, {x: 50, z: 0}, {x: -50, z: 0}];
                     spawnPoints = [{x: 20, z: 20}, {x: -20, z: -20}, {x: 0, z: 50}];
                 }
                 else if (cycle === 6) {
-                    // Claustrophobie: Beaucoup de murs
                     for(let i=0; i<20; i++) {
                         const x = (Math.random()-0.5)*120;
                         const z = (Math.random()-0.5)*120;
@@ -618,12 +612,10 @@
                     spawnPoints = [{x: 0, z: 0}, {x: 10, z: 0}, {x: -10, z: 0}];
                 }
                 else {
-                    // Cycle 7: Le Vide (Rien à part le but)
                     socketPoints = [{x: 0, z: 20}, {x: 20, z: -20}, {x: -20, z: -20}];
                     spawnPoints = [{x: 0, z: 0}, {x: 0, z: 0}, {x: 0, z: 0}];
                 }
 
-                // Génération des Sockets et Cores basés sur les points
                 for(let i=0; i<3; i++) {
                     const sp = socketPoints[i] || {x: i*10, z: 0};
                     
@@ -644,14 +636,12 @@
                     this.levelObjects.push({ mesh: sMesh, body: null });
                     this.levelObjects.push({ mesh: beam, body: null });
 
-                    // Core Pos
                     const cp = spawnPoints[i] || {x: 0, z: 0};
                     
                     const cMesh = this.architect.createCoreMesh();
                     cMesh.position.set(cp.x, 5, cp.z);
                     this.scene.add(cMesh);
                     
-                    // Core physique
                     const cBodyDesc = RAPIER.RigidBodyDesc.dynamic()
                         .setTranslation(cp.x, 5, cp.z)
                         .setLinearDamping(0.8)
@@ -669,17 +659,18 @@
             }
 
             initPlayer() {
-                // Utilisation du Character Controller de Rapier pour corriger les bugs de déplacement
                 const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 5, 0);
                 this.characterBody = this.physicsWorld.createRigidBody(bodyDesc);
                 
-                const colliderDesc = RAPIER.ColliderDesc.capsule(0.5, 0.5).setTranslation(0, 0, 0);
+                // Capsule plus fine pour éviter les accrochages muraux
+                const colliderDesc = RAPIER.ColliderDesc.capsule(0.5, 0.4).setTranslation(0, 0, 0);
                 this.characterCollider = this.physicsWorld.createCollider(colliderDesc, this.characterBody);
 
                 const offset = 0.1;
                 this.characterController = this.physicsWorld.createCharacterController(offset);
-                this.characterController.enableAutostep(0.7, 0.3, true); // Permet de monter des petites marches
-                this.characterController.enableSnapToGround(0.5); // Colle au sol
+                this.characterController.enableAutostep(0.7, 0.3, true); 
+                this.characterController.enableSnapToGround(0.5); 
+                this.characterController.setMaxSlopeClimbAngle(45 * Math.PI / 180); // Limite la pente pour éviter de glisser
 
                 this.camera.position.set(0, 2, 0);
                 this.verticalVelocity = 0;
@@ -703,9 +694,9 @@
                         this.camera.getWorldDirection(camDir);
                         camDir.y = 0.4; 
                         camDir.normalize();
-                        const force = camDir.multiplyScalar(25); // Force de poussée
+                        const force = camDir.multiplyScalar(25); 
                         core.body.applyImpulse(force, true);
-                        core.body.setAngvel({x: Math.random(), y: Math.random(), z: Math.random()}, true); // Petit effet de rotation
+                        core.body.setAngvel({x: Math.random(), y: Math.random(), z: Math.random()}, true); 
                     }
                 }
             }
@@ -724,14 +715,32 @@
             }
 
             lockCore(core, socket) {
+                // Bug Fix: Vérifier si le joueur n'est pas TROP près de l'endroit où le bloc va se figer
+                // Si le joueur est en collision avec un bloc 'Fixed', Rapier peut faire glitcher le Kinematic controller
+                const playerPos = this.characterBody.translation();
+                const distToPlayer = new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z).distanceTo(socket.pos);
+
+                // Si le joueur est trop près, on le repousse légèrement pour éviter qu'il ne reste coincé dans le bloc qui devient solide
+                if(distToPlayer < 2.5) {
+                    // Calcul vecteur répulsion
+                    const pushDir = new THREE.Vector3(playerPos.x - socket.pos.x, 0, playerPos.z - socket.pos.z).normalize();
+                    const safePos = {
+                        x: playerPos.x + pushDir.x * 2,
+                        y: playerPos.y + 0.5,
+                        z: playerPos.z + pushDir.z * 2
+                    };
+                    // Téléportation de sécurité du joueur
+                    this.characterBody.setNextKinematicTranslation(safePos);
+                }
+
                 core.locked = true;
                 socket.active = true;
                 this.score++;
 
                 core.body.setBodyType(RAPIER.RigidBodyType.Fixed);
-                core.body.setTranslation(socket.pos.x, socket.pos.y, socket.pos.z, true);
+                // On s'assure que la position est parfaitement alignée
+                core.body.setTranslation(socket.pos, true);
                 core.body.setRotation({x:0, y:0, z:0, w:1}, true);
-                // Important: Réinitialiser la vélocité pour éviter les fantômes
                 core.body.setLinvel({x:0, y:0, z:0}, true);
                 core.body.setAngvel({x:0, y:0, z:0}, true);
                 
@@ -803,44 +812,40 @@
             updatePlayer(dt) {
                 if(!this.controls.isLocked) return;
 
-                // --- CORRECTION SENIOR: Gestion Vectorielle Robuste ---
-                
-                // 1. Récupérer la direction "Avant" de la caméra
-                const forward = new THREE.Vector3();
-                this.camera.getWorldDirection(forward);
-                forward.y = 0; // On aplatit sur le plan Y pour ne pas voler/s'enfoncer en regardant haut/bas
-                forward.normalize();
-
-                // 2. Calculer la direction "Droite" (Produit vectoriel avec l'axe Y Haut)
-                const right = new THREE.Vector3();
-                right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize(); // Inversion du produit pour avoir la droite correcte
-                // Note: ThreeJS est Right-Handed, parfois il faut cross(Up, Forward) ou cross(Forward, Up) selon le sens.
-                // Standard: Forward (Z-) x Up (Y+) = Right (X+) -> crossVectors(forward, up) est souvent Left. 
-                // Correction Senior: On utilise crossVectors(this.camera.up, forward) pour Left, ou inversement.
-                // Simplification sûre:
-                right.crossVectors(forward, this.camera.up).negate(); // Pour être sûr d'avoir la droite
+                // --- CORRECTION EXPERT 2026 : DÉPLACEMENT ABSOLU PAR VECTEURS ---
+                // Le problème : camera.rotation.y est instable si on regarde en haut/bas.
+                // La solution : On demande le vecteur "Forward" réel, on l'écrase sur Y=0.
 
                 const moveVector = new THREE.Vector3(0, 0, 0);
+                const forward = new THREE.Vector3();
+                const right = new THREE.Vector3();
 
-                // 3. Application des Inputs (Flèches et ZQSD unifiés)
-                // Avant/Arrière
+                // 1. Quelle est la direction EXACTE pointée par la caméra ?
+                this.camera.getWorldDirection(forward);
+                
+                // 2. On aplatit sur le plan horizontal (XZ) pour ne pas ralentir en regardant le sol
+                forward.y = 0;
+                forward.normalize();
+
+                // 3. Calcul du vecteur "Droite" (Produit vectoriel classique)
+                right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+                // 4. Composition du mouvement (WASD + Flèches)
                 if (this.keys['KeyW'] || this.keys['ArrowUp']) moveVector.add(forward);
                 if (this.keys['KeyS'] || this.keys['ArrowDown']) moveVector.sub(forward);
-                
-                // Gauche/Droite (Strafe)
-                if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveVector.sub(right);
                 if (this.keys['KeyD'] || this.keys['ArrowRight']) moveVector.add(right);
+                if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveVector.sub(right);
 
-                // Normalisation pour éviter d'aller plus vite en diagonale
+                // 5. Normalisation et Vitesse
                 if (moveVector.lengthSq() > 0) {
                     moveVector.normalize().multiplyScalar(CONFIG.playerSpeed * dt);
                 }
 
-                // 4. Gestion de la gravité (inchangée, elle était correcte)
+                // 6. Gestion Gravité
                 const grounded = this.characterController.computedGrounded();
                 
                 if (grounded) {
-                    this.verticalVelocity = -5.0; 
+                    this.verticalVelocity = -2.0; 
                     this.canJump = true;
                 } else {
                     this.verticalVelocity += CONFIG.gravity.y * dt * 2.5; 
@@ -851,13 +856,16 @@
                     this.verticalVelocity = CONFIG.playerJump;
                 }
 
-                // Application de la vélocité verticale au vecteur final
-                moveVector.y = this.verticalVelocity * dt;
+                // 7. Envoi au moteur physique
+                const finalMovement = {
+                    x: moveVector.x,
+                    y: this.verticalVelocity * dt,
+                    z: moveVector.z
+                };
 
-                // 5. Envoi au moteur physique
                 this.characterController.computeColliderMovement(
                     this.characterCollider,
-                    moveVector
+                    finalMovement
                 );
 
                 const correctedMovement = this.characterController.computedMovement();
@@ -874,7 +882,7 @@
 
             animate() {
                 requestAnimationFrame(() => this.animate());
-                const dt = Math.min(this.clock.getDelta(), 0.1); // Cap dt pour éviter les sauts énormes
+                const dt = Math.min(this.clock.getDelta(), 0.05); // Cap plus strict sur dt pour la physique
                 
                 if (this.ready) {
                     this.physicsWorld.step();
@@ -897,24 +905,25 @@
 
             async start() {
                 document.getElementById('start-screen').querySelector('p').innerText = "INITIALISATION DES SYSTÈMES...";
-                this.keys = {};
                 
-                // --- CORRECTION SENIOR: Gestion des événements clavier ---
-                // On empêche le navigateur de scroller quand on joue avec les flèches
                 document.addEventListener('keydown', (e) => {
-                    this.keys[e.code] = true;
-                    if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+                    if(this.keys.hasOwnProperty(e.code)) {
+                        this.keys[e.code] = true;
+                        // Empêcher le scroll uniquement pour les touches de jeu
                         e.preventDefault();
                     }
                 });
                 
-                document.addEventListener('keyup', (e) => this.keys[e.code] = false);
+                document.addEventListener('keyup', (e) => {
+                    if(this.keys.hasOwnProperty(e.code)) {
+                        this.keys[e.code] = false;
+                    }
+                });
 
                 await this.initPhysics();
                 this.initGraphics();
                 await this.audio.init();
                 
-                // Lancer le premier cycle
                 this.loadCycle(1);
 
                 document.getElementById('start-screen').style.opacity = '0';
