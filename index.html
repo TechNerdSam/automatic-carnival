@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AETHERIS ARCHITECT | Director's Cut (Engine v3.0)</title>
+    <title>AETHERIS ARCHITECT | Final Cut</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 fill=%22%23050505%22/><path d=%22M14 10 H30 V18 H22 V46 H30 V54 H14 Z M50 10 H34 V18 H42 V46 H34 V54 H50 Z%22 fill=%22%23ffffff%22/><rect x=%2226%22 y=%2226%22 width=%2212%22 height=%2212%22 fill=%22%2300d9ff%22/></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -31,7 +31,6 @@
             user-select: none;
         }
 
-        /* Optimisation UI : will-change pour aider le navigateur */
         #ui-layer {
             position: absolute;
             top: 0;
@@ -44,7 +43,6 @@
             flex-direction: column;
             justify-content: space-between;
             transition: opacity 1s ease;
-            will-change: opacity;
         }
 
         #scanlines {
@@ -123,6 +121,7 @@
             box-shadow: 0 0 10px var(--color-success);
         }
 
+        /* --- STYLES DU MENU PRINCIPAL --- */
         #start-screen, #cycle-screen, #ending-screen {
             position: absolute;
             top: 0;
@@ -173,7 +172,7 @@
             transition: all 0.3s ease;
             margin-top: 40px;
             opacity: 0;
-            animation: fadeIn 2s forwards 4s; 
+            animation: fadeIn 2s forwards 4s; /* Apparait tard */
         }
         .btn-restart:hover {
             background: black;
@@ -239,6 +238,7 @@
         }
         #controls-hint.visible { opacity: 1; }
 
+        /* Effet de fondu blanc pour la fin */
         #white-fade {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -266,7 +266,7 @@
                 </div>
             </div>
             <div class="hud-text text-right">
-                ARCHITECT_OS v3.0 (PERFORMANCE)<br>
+                ARCHITECT_OS v2.5<br>
                 CYCLE: <span id="cycle-display">--</span>
             </div>
         </div>
@@ -286,7 +286,7 @@
             </div>
             <div id="perf-monitor" class="hud-text text-right">
                 FPS: <span id="fps-counter">60</span><br>
-                PHYSICS: <span style="color:var(--color-success)">LOCKED 60HZ</span>
+                GRAVITÉ: STABLE
             </div>
         </div>
     </div>
@@ -301,7 +301,7 @@
             <div id="loader" class="loader-bar">
                 <div class="loader-progress"></div>
             </div>
-            <p id="loading-text" class="hud-text text-gray-500 mt-4 text-xs tracking-widest hidden">COMPILATION SHADERS & PHYSIQUE...</p>
+            <p id="loading-text" class="hud-text text-gray-500 mt-4 text-xs tracking-widest hidden">CHARGEMENT MODULE PHYSIQUE...</p>
         </div>
 
         <div id="level-selector" class="hidden flex-col items-center w-full max-w-5xl px-8 fade-in">
@@ -347,13 +347,11 @@
     <script type="module">
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-        // CORRECTION ICI : Importation de tout le module pour éviter l'erreur "SyntaxError: The requested module ... does not provide an export named ..."
-        import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
         import RAPIER from '@dimforge/rapier3d-compat';
         
         const CONFIG = {
             fov: 80,
-            renderDistance: 500,
+            renderDistance: 500, // Augmenté pour la fin
             playerSpeed: 12.0,
             playerJump: 18.0, 
             gravity: { x: 0.0, y: -30.0, z: 0.0 },
@@ -462,8 +460,10 @@
                 osc.stop(this.ctx.currentTime + 4);
             }
 
+            // Son de fin majestueux
             triggerEnding() {
                 if(!this.initialized) return;
+                // Accord final
                 const freqs = [220, 277.18, 329.63, 440, 554.37, 880];
                 const now = this.ctx.currentTime;
                 
@@ -490,7 +490,6 @@
             }
 
             setPalette(palette) {
-                // Réutilisation des matériaux pour limiter le switch GPU
                 this.materials = {
                     concrete: new THREE.MeshStandardMaterial({
                         color: palette.concrete,
@@ -513,29 +512,22 @@
                         roughness: 0.5,
                         metalness: 0.8
                     }),
-                    beam: new THREE.MeshBasicMaterial({ 
-                        color: palette.accent, 
-                        transparent: true, opacity: 0.1, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
-                    }),
                     accentColor: palette.accent
                 };
             }
 
             createSocketMesh() {
                 const geometry = new THREE.CylinderGeometry(3.5, 3.5, 0.4, 32); 
-                const mesh = new THREE.Mesh(geometry, this.materials.socket);
+                const mesh = new THREE.Mesh(geometry, this.materials.socket.clone());
                 mesh.receiveShadow = true;
                 return mesh;
             }
 
             createCoreMesh() {
                 const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-                const mesh = new THREE.Mesh(geometry, this.materials.core);
+                const mesh = new THREE.Mesh(geometry, this.materials.core.clone());
                 mesh.castShadow = true;
                 const light = new THREE.PointLight(this.materials.accentColor, 2, 8);
-                // Shadow map réduite pour les lumières dynamiques
-                light.shadow.mapSize.width = 512;
-                light.shadow.mapSize.height = 512;
                 mesh.add(light);
                 return mesh;
             }
@@ -553,19 +545,6 @@
                 this.physicsWorld = null;
                 this.characterController = null; 
                 
-                // --- OPTIMISATION: VECTEURS RÉUTILISABLES (ZERO ALLOCATION) ---
-                // Ces objets sont créés une fois et réutilisés à chaque frame.
-                // Cela élimine 99% du travail du Garbage Collector.
-                this._vec3 = new THREE.Vector3();
-                this._vec3_2 = new THREE.Vector3();
-                this._quat = new THREE.Quaternion();
-                this._euler = new THREE.Euler();
-                this._mouse = new THREE.Vector2(0,0);
-                
-                // Variables Physique
-                this.physicsStepTime = 1 / 60; 
-                this.physicsAccumulator = 0;
-
                 this.levelObjects = []; 
                 this.sockets = []; 
                 this.cores = []; 
@@ -579,6 +558,7 @@
                 this.maxScore = 3; 
                 
                 this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2(0,0);
                 
                 this.verticalVelocity = 0;
                 this.canJump = false;
@@ -592,8 +572,6 @@
                 };
 
                 this.isGameRunning = false;
-                this.frameCount = 0;
-                this.lastTime = 0;
             }
 
             async initPhysics() {
@@ -609,17 +587,10 @@
                 this.camera = new THREE.PerspectiveCamera(CONFIG.fov, window.innerWidth / window.innerHeight, 0.1, CONFIG.renderDistance);
                 this.camera.position.set(0, 2, 0);
 
-                this.renderer = new THREE.WebGLRenderer({ 
-                    antialias: true, 
-                    powerPreference: "high-performance",
-                    precision: "mediump"
-                });
-                // Cap du PixelRatio pour éviter la surchauffe sur les écrans Retina/4K
-                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.renderer.shadowMap.enabled = true;
                 this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-                
                 this.container.appendChild(this.renderer.domElement);
 
                 this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
@@ -628,9 +599,7 @@
                 this.dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
                 this.dirLight.position.set(30, 80, 40);
                 this.dirLight.castShadow = true;
-                // Taille de ShadowMap optimisée (1024 est suffisant pour le style Low Poly)
-                this.dirLight.shadow.mapSize.set(1024, 1024); 
-                this.dirLight.shadow.bias = -0.0005;
+                this.dirLight.shadow.mapSize.set(2048, 2048);
                 const d = 100;
                 this.dirLight.shadow.camera.left = -d;
                 this.dirLight.shadow.camera.right = d;
@@ -738,77 +707,67 @@
                 this.buildGeometry(cycleIndex);
                 this.initPlayer();
                 
-                // Compilation préemptive pour éviter le freeze à la première frame
-                this.renderer.compile(this.scene, this.camera);
-                
                 this.ready = true;
             }
 
             buildGeometry(cycle) {
-                // --- OPTIMISATION: GEOMETRY MERGING ---
-                // Au lieu de créer 50 Mesh séparés (50 draw calls), on fusionne tout ce qui est statique.
-                // Gain de performance massif sur CPU et GPU.
-                
-                const wallsGeometries = [];
-                const wallMaterial = this.architect.materials.concrete;
-
-                // 1. Sol
                 const floorGeo = new THREE.BoxGeometry(160, 2, 160);
-                floorGeo.translate(0, -1, 0); // Apply position to geometry
-                wallsGeometries.push(floorGeo);
-                
+                const floorMesh = new THREE.Mesh(floorGeo, this.architect.materials.concrete);
+                floorMesh.position.y = -1;
+                floorMesh.receiveShadow = true;
+                this.scene.add(floorMesh);
                 const floorBody = this.physicsWorld.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -1, 0));
                 this.physicsWorld.createCollider(RAPIER.ColliderDesc.cuboid(80, 1, 80), floorBody);
-                // Note: On ne push plus dans levelObjects pour le mesh car il sera merged
+                this.levelObjects.push({ mesh: floorMesh, body: floorBody });
 
-                // Helper pour créer mur physique + géométrie à fusionner
-                const addWall = (x, z, w, h, d) => {
-                    const geo = new THREE.BoxGeometry(w, h, d);
-                    geo.translate(x, h/2, z);
-                    wallsGeometries.push(geo);
-                    
+                const createWall = (x, z, w, h, d) => {
+                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this.architect.materials.concrete);
+                    mesh.position.set(x, h/2, z);
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    this.scene.add(mesh);
                     const body = this.physicsWorld.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x, h/2, z));
                     this.physicsWorld.createCollider(RAPIER.ColliderDesc.cuboid(w/2, h/2, d/2), body);
-                    // On garde le body pour le cleanup physique, mais pas de mesh individuel
-                    this.levelObjects.push({ mesh: null, body: body });
+                    this.levelObjects.push({ mesh, body });
                 };
 
-                addWall(0, -80, 160, 20, 10);
-                addWall(0, 80, 160, 20, 10);
-                addWall(-80, 0, 10, 20, 160);
-                addWall(80, 0, 10, 20, 160);
+                createWall(0, -80, 160, 20, 10);
+                createWall(0, 80, 160, 20, 10);
+                createWall(-80, 0, 10, 20, 160);
+                createWall(80, 0, 10, 20, 160);
 
                 let spawnPoints = [];
                 let socketPoints = [];
 
+                // ... Level generation logic (kept the same as per Ground Update) ...
                 if (cycle === 1) {
                     socketPoints = [{x: 0, z: 15}, {x: -15, z: 0}, {x: 15, z: 0}];
                     spawnPoints = [{x: 0, z: -10}, {x: -10, z: -10}, {x: 10, z: -10}];
                 } else if (cycle === 2) {
-                    addWall(0, 0, 20, 6, 20); 
+                    createWall(0, 0, 20, 6, 20); 
                     socketPoints = [{x: 30, z: 30}, {x: -30, z: 30}, {x: 0, z: -40}];
                     spawnPoints = [{x: 30, z: -30}, {x: -30, z: -30}, {x: 0, z: 40}];
                 } else if (cycle === 3) {
-                    addWall(-20, 0, 5, 8, 60); addWall(20, 0, 5, 8, 60);
+                    createWall(-20, 0, 5, 8, 60); createWall(20, 0, 5, 8, 60);
                     socketPoints = [{x: 0, z: 50}, {x: -40, z: 0}, {x: 40, z: 0}];
                     spawnPoints = [{x: 0, z: -30}, {x: -40, z: 20}, {x: 40, z: 20}];
                 } else if (cycle === 4) {
-                    addWall(0, 20, 80, 6, 5); addWall(0, -20, 80, 6, 5);
+                    createWall(0, 20, 80, 6, 5); createWall(0, -20, 80, 6, 5);
                     socketPoints = [{x: 50, z: 0}, {x: -50, z: 0}, {x: 0, z: 50}];
                     spawnPoints = [{x: 0, z: 0}, {x: 20, z: 0}, {x: -20, z: 0}];
                 } else if (cycle === 5) {
-                    addWall(25, 25, 5, 8, 20); addWall(40, 15, 20, 8, 5); 
-                    addWall(-25, -25, 5, 8, 20); addWall(-40, -15, 20, 8, 5);
-                    addWall(10, -10, 4, 12, 4); addWall(-10, 10, 4, 12, 4);
+                    createWall(25, 25, 5, 8, 20); createWall(40, 15, 20, 8, 5); 
+                    createWall(-25, -25, 5, 8, 20); createWall(-40, -15, 20, 8, 5);
+                    createWall(10, -10, 4, 12, 4); createWall(-10, 10, 4, 12, 4);
                     socketPoints = [{x: 35, z: 35}, {x: -35, z: -35}, {x: 0, z: 0}];
                     spawnPoints = [{x: 0, z: 40}, {x: 0, z: -40}, {x: 0, z: 0}]; 
                 } else if (cycle === 6) {
-                    addWall(0, 30, 20, 30, 20); addWall(-50, 0, 10, 20, 10); addWall(50, 0, 10, 20, 10);
+                    createWall(0, 30, 20, 30, 20); createWall(-50, 0, 10, 20, 10); createWall(50, 0, 10, 20, 10);
                     socketPoints = [{x: 0, z: -40}, {x: -40, z: 20}, {x: 40, z: 20}];
                     spawnPoints = [{x: 0, z: 50}, {x: -50, z: -10}, {x: 50, z: -10}];
                 } else if (cycle === 7) {
                     for(let z=-40; z<=40; z+=20) {
-                        addWall(20, z, 2, 10, 2); addWall(-20, z, 2, 10, 2); 
+                        createWall(20, z, 2, 10, 2); createWall(-20, z, 2, 10, 2); 
                     }
                     socketPoints = [{x: 0, z: 30}, {x: 0, z: 0}, {x: 0, z: -30}];
                     spawnPoints = [{x: 5, z: 30}, {x: -5, z: 0}, {x: 5, z: -30}];
@@ -817,17 +776,6 @@
                      spawnPoints = [{x: 0, z: 0}, {x: 0, z: 0}, {x: 0, z: 0}];
                 }
 
-                // Fusion des géométries
-                if (wallsGeometries.length > 0) {
-                    const mergedGeometry = BufferGeometryUtils.mergeGeometries(wallsGeometries);
-                    const mergedMesh = new THREE.Mesh(mergedGeometry, wallMaterial);
-                    mergedMesh.receiveShadow = true;
-                    mergedMesh.castShadow = true;
-                    this.scene.add(mergedMesh);
-                    this.levelObjects.push({ mesh: mergedMesh, body: null }); // Pour le cleanup
-                }
-
-                // Création des objets dynamiques (non fusionnés)
                 for(let i=0; i<3; i++) {
                     const sp = socketPoints[i] || {x: i*15, z: 0};
                     const sMesh = this.architect.createSocketMesh();
@@ -835,7 +783,8 @@
                     this.scene.add(sMesh);
                     
                     const beamGeo = new THREE.ConeGeometry(3, 60, 32, 1, true);
-                    const beam = new THREE.Mesh(beamGeo, this.architect.materials.beam);
+                    const beamMat = new THREE.MeshBasicMaterial({ color: this.architect.materials.accentColor, transparent: true, opacity: 0.1, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+                    const beam = new THREE.Mesh(beamGeo, beamMat);
                     beam.position.set(sp.x, 30, sp.z);
                     this.scene.add(beam);
                     
@@ -874,7 +823,7 @@
 
             tryGrabObject() {
                 if(this.heldObject) return;
-                this.raycaster.setFromCamera(this._mouse, this.camera);
+                this.raycaster.setFromCamera(new THREE.Vector2(0,0), this.camera);
                 const interactables = this.cores.filter(c => !c.locked).map(c => c.mesh);
                 const intersects = this.raycaster.intersectObjects(interactables);
                 if(intersects.length > 0 && intersects[0].distance < CONFIG.grabDistance) {
@@ -896,58 +845,36 @@
                 }
             }
 
-            // OPTIMISATION: Logique physique sans 'new Vector3'
-            updatePhysicsLogic(dt) {
-                // Gestion objet tenu
-                if(this.heldObject) {
-                    // Utilisation des vecteurs temporaires _vec3
-                    this.camera.getWorldDirection(this._vec3);
-                    this._vec3.multiplyScalar(CONFIG.holdDistance);
-                    this._vec3.add(this.camera.position); // Target Position
-                    
-                    const corePos = this.heldObject.body.translation();
-                    this._vec3_2.set(corePos.x, corePos.y, corePos.z); // Current Position
-                    
-                    // Direction vector reused
-                    const dir = this._vec3.sub(this._vec3_2);
-                    const dist = dir.length();
-                    
-                    if(dist > 10) { this.releaseObject(); }
-                    else {
-                        dir.normalize().multiplyScalar(dist * 800 * dt); 
-                        this.heldObject.body.setLinvel({x: dir.x, y: dir.y, z: dir.z}, true);
-                        this.heldObject.body.setAngvel({x:0, y:0, z:0}, true);
-                        this.heldObject.body.setRotation({x:0, y:0, z:0, w:1}, true); 
-                    }
-                }
-
-                // Magnétisme
-                this.cores.forEach(c => {
-                    if(!c.locked) {
-                         this.applyMagnetism(c);
-                    }
-                });
-
-                this.updatePlayer(dt);
+            updateHeldObject(dt) {
+                if(!this.heldObject) return;
+                const holdPos = new THREE.Vector3();
+                this.camera.getWorldDirection(holdPos);
+                holdPos.multiplyScalar(CONFIG.holdDistance);
+                holdPos.add(this.camera.position);
+                const corePos = this.heldObject.body.translation();
+                const coreVec = new THREE.Vector3(corePos.x, corePos.y, corePos.z);
+                const dir = new THREE.Vector3().subVectors(holdPos, coreVec);
+                const dist = dir.length();
+                if(dist > 10) { this.releaseObject(); return; }
+                dir.normalize().multiplyScalar(dist * 800 * dt); 
+                this.heldObject.body.setLinvel({x: dir.x, y: dir.y, z: dir.z}, true);
+                this.heldObject.body.setAngvel({x:0, y:0, z:0}, true);
+                this.heldObject.body.setRotation({x:0, y:0, z:0, w:1}, true); 
             }
 
             applyMagnetism(core) {
                 if(core.locked || this.heldObject === core) return;
                 let closestSocket = null;
                 let minDist = CONFIG.magnetRadius;
-                
                 this.sockets.forEach(socket => {
                     if (socket.active) return;
                     const dist = core.mesh.position.distanceTo(socket.pos);
                     if (dist < minDist) { minDist = dist; closestSocket = socket; }
                 });
-                
                 if (closestSocket) {
                     const corePos = core.body.translation();
-                    // Zero-alloc vector math
-                    this._vec3.set(closestSocket.pos.x - corePos.x, closestSocket.pos.y - corePos.y, closestSocket.pos.z - corePos.z).normalize();
-                    
-                    core.body.applyImpulse({x: this._vec3.x * 0.5, y: -0.1, z: this._vec3.z * 0.5}, true);
+                    const forceDir = new THREE.Vector3(closestSocket.pos.x - corePos.x, closestSocket.pos.y - corePos.y, closestSocket.pos.z - corePos.z).normalize();
+                    core.body.applyImpulse({x: forceDir.x * 0.5, y: -0.1, z: forceDir.z * 0.5}, true);
                     if (minDist < 1.5) { this.lockCore(core, closestSocket); }
                 }
             }
@@ -955,18 +882,11 @@
             lockCore(core, socket) {
                 if(this.heldObject === core) this.releaseObject();
                 const playerPos = this.characterBody.translation();
-                this._vec3.set(playerPos.x, playerPos.y, playerPos.z);
-                const distToPlayer = this._vec3.distanceTo(socket.pos);
-                
+                const distToPlayer = new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z).distanceTo(socket.pos);
                 if(distToPlayer < 2.5) {
-                    this._vec3.set(playerPos.x - socket.pos.x, 0, playerPos.z - socket.pos.z).normalize();
-                    this.characterBody.setNextKinematicTranslation({
-                        x: playerPos.x + this._vec3.x * 2, 
-                        y: playerPos.y + 0.5, 
-                        z: playerPos.z + this._vec3.z * 2
-                    });
+                    const pushDir = new THREE.Vector3(playerPos.x - socket.pos.x, 0, playerPos.z - socket.pos.z).normalize();
+                    this.characterBody.setNextKinematicTranslation({x: playerPos.x + pushDir.x * 2, y: playerPos.y + 0.5, z: playerPos.z + pushDir.z * 2});
                 }
-                
                 core.locked = true;
                 socket.active = true;
                 this.score++;
@@ -987,6 +907,7 @@
 
             completeCycle() {
                 if (this.currentCycle < CONFIG.maxCycles) {
+                    // Transition normale
                     this.audio.triggerCycleComplete();
                     const screen = document.getElementById('cycle-screen');
                     screen.style.display = 'flex';
@@ -995,51 +916,70 @@
                     setTimeout(() => {
                         this.currentCycle++;
                         this.loadCycle(this.currentCycle);
+                        
                         setTimeout(() => {
                             screen.style.opacity = '0';
                             setTimeout(() => screen.style.display = 'none', 1000);
                         }, 500);
                     }, 3000);
                 } else {
+                    // FIN MAGISTRALE DU CYCLE 7
                     this.triggerFinalSequence();
                 }
             }
 
             triggerFinalSequence() {
                 this.isEnding = true;
-                this.controls.unlock(); 
-                document.getElementById('ui-layer').style.opacity = '0';
+                this.controls.unlock(); // Relâche la souris
+                document.getElementById('ui-layer').style.opacity = '0'; // Cache le HUD
                 this.audio.triggerEnding();
-                this.physicsWorld.gravity = {x: 0, y: 0.5, z: 0}; 
+
+                // 1. Désactiver la gravité pour tout le monde
+                this.physicsWorld.gravity = {x: 0, y: 0.5, z: 0}; // Légère gravité inversée
                 
+                // 2. Création de particules d'ascension
                 const geometry = new THREE.BufferGeometry();
                 const vertices = [];
                 for(let i=0; i<2000; i++) {
-                    vertices.push((Math.random() - 0.5) * 100, Math.random() * 50, (Math.random() - 0.5) * 100);
+                    vertices.push(
+                        (Math.random() - 0.5) * 100,
+                        Math.random() * 50,
+                        (Math.random() - 0.5) * 100
+                    );
                 }
                 geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
                 const material = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2, transparent: true, opacity: 0.8 });
                 this.endingParticles = new THREE.Points(geometry, material);
                 this.scene.add(this.endingParticles);
 
+                // 3. Animation de la lumière
                 const targetColor = new THREE.Color(0xffffff);
-                const duration = 5000; 
+                const duration = 5000; // 5 secondes
                 let startTime = Date.now();
 
                 const animateEnding = () => {
                     const elapsed = Date.now() - startTime;
                     const alpha = Math.min(elapsed / duration, 1);
+                    
+                    // La scène devient blanche
                     this.scene.background.lerp(targetColor, 0.01);
                     this.scene.fog.color.lerp(targetColor, 0.01);
                     this.scene.fog.density += 0.0005;
+
+                    // La caméra s'élève doucement
                     this.camera.position.y += 0.1;
                     this.camera.lookAt(0, 100, 0);
+
+                    // Les particules montent
                     if(this.endingParticles) {
                         this.endingParticles.position.y += 0.2;
                         this.endingParticles.rotation.y += 0.001;
                     }
-                    if(alpha < 1) { requestAnimationFrame(animateEnding); } 
-                    else {
+
+                    if(alpha < 1) {
+                        requestAnimationFrame(animateEnding);
+                    } else {
+                        // Écran blanc final
                         document.getElementById('white-fade').style.opacity = '1';
                         setTimeout(() => {
                              document.getElementById('ending-screen').style.display = 'flex';
@@ -1047,10 +987,12 @@
                         }, 2000);
                     }
                 };
+                
                 animateEnding();
             }
 
             triggerWin() {
+                // Déprécié au profit de triggerFinalSequence pour le cycle 7
                 document.getElementById('success-message').classList.add('visible');
             }
 
@@ -1062,7 +1004,8 @@
 
             updateReticle() {
                 if(this.heldObject || this.isEnding) return;
-                this.raycaster.setFromCamera(this._mouse, this.camera);
+
+                this.raycaster.setFromCamera(new THREE.Vector2(0,0), this.camera);
                 const interactables = this.cores.filter(c => !c.locked).map(c => c.mesh);
                 const intersects = this.raycaster.intersectObjects(interactables);
                 const reticle = document.getElementById('reticle');
@@ -1080,74 +1023,50 @@
             updatePlayer(dt) {
                 if(!this.controls.isLocked) return;
 
-                // Zero allocation vector math
-                this._vec3.set(0, 0, 0); // MoveVector
-                this._vec3_2.set(0, 0, 0); // Forward
+                const moveVector = new THREE.Vector3(0, 0, 0);
+                const forward = new THREE.Vector3();
+                const right = new THREE.Vector3();
+                this.camera.getWorldDirection(forward); forward.y = 0; forward.normalize();
+                right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
 
-                this.camera.getWorldDirection(this._vec3_2); 
-                this._vec3_2.y = 0; 
-                this._vec3_2.normalize();
-                
-                // Right vector calculation using cross product
-                this._quat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
-                const right = this._vec3_2.clone().applyQuaternion(this._quat).normalize(); // Clone here is okay-ish but can be optimized further, keeping it simple for readability
+                if (this.keys['KeyW'] || this.keys['ArrowUp']) moveVector.add(forward);
+                if (this.keys['KeyS'] || this.keys['ArrowDown']) moveVector.sub(forward);
+                if (this.keys['KeyD'] || this.keys['ArrowRight']) moveVector.add(right);
+                if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveVector.sub(right);
 
-                if (this.keys['KeyW'] || this.keys['ArrowUp']) this._vec3.add(this._vec3_2);
-                if (this.keys['KeyS'] || this.keys['ArrowDown']) this._vec3.sub(this._vec3_2);
-                if (this.keys['KeyD'] || this.keys['ArrowRight']) this._vec3.add(right);
-                if (this.keys['KeyA'] || this.keys['ArrowLeft']) this._vec3.sub(right);
-
-                if (this._vec3.lengthSq() > 0) { this._vec3.normalize().multiplyScalar(CONFIG.playerSpeed * dt); }
+                if (moveVector.lengthSq() > 0) { moveVector.normalize().multiplyScalar(CONFIG.playerSpeed * dt); }
 
                 const grounded = this.characterController.computedGrounded();
                 if (grounded) { this.verticalVelocity = -2.0; this.canJump = true; } 
                 else { this.verticalVelocity += CONFIG.gravity.y * dt * 2.0; this.canJump = false; }
                 if (this.keys['Space'] && grounded) { this.verticalVelocity = CONFIG.playerJump; }
 
-                this.characterController.computeColliderMovement(this.characterCollider, { x: this._vec3.x, y: this.verticalVelocity * dt, z: this._vec3.z });
+                this.characterController.computeColliderMovement(this.characterCollider, { x: moveVector.x, y: this.verticalVelocity * dt, z: moveVector.z });
                 const correctedMovement = this.characterController.computedMovement();
                 const currentPos = this.characterBody.translation();
-                this.characterBody.setNextKinematicTranslation({
-                    x: currentPos.x + correctedMovement.x, 
-                    y: currentPos.y + correctedMovement.y, 
-                    z: currentPos.z + correctedMovement.z
-                });
+                this.characterBody.setNextKinematicTranslation({x: currentPos.x + correctedMovement.x, y: currentPos.y + correctedMovement.y, z: currentPos.z + correctedMovement.z});
                 this.camera.position.set(currentPos.x + correctedMovement.x, currentPos.y + correctedMovement.y + 0.8, currentPos.z + correctedMovement.z);
             }
 
             animate() {
                 requestAnimationFrame(() => this.animate());
+                const dt = Math.min(this.clock.getDelta(), 0.05);
                 
-                const now = performance.now();
-                this.frameCount++;
-                if (now - this.lastTime >= 1000) {
-                    document.getElementById('fps-counter').innerText = this.frameCount;
-                    this.frameCount = 0;
-                    this.lastTime = now;
-                }
-
                 if (this.ready && this.isGameRunning) {
-                    const frameDelta = this.clock.getDelta();
-                    this.physicsAccumulator += frameDelta;
-                    if(this.physicsAccumulator > 0.2) this.physicsAccumulator = 0.2;
-
-                    while (this.physicsAccumulator >= this.physicsStepTime) {
-                        this.physicsWorld.step();
-                        if(!this.isEnding) {
-                            this.updatePhysicsLogic(this.physicsStepTime);
-                        }
-                        this.physicsAccumulator -= this.physicsStepTime;
-                    }
-
+                    this.updateHeldObject(dt);
+                    this.physicsWorld.step();
+                    
                     this.cores.forEach(c => {
                         if(!c.locked) {
                             const pos = c.body.translation();
                             const rot = c.body.rotation();
                             c.mesh.position.set(pos.x, pos.y, pos.z);
                             c.mesh.quaternion.set(rot.x, rot.y, rot.z, rot.w);
+                            this.applyMagnetism(c);
                         }
                     });
                     
+                    if(!this.isEnding) this.updatePlayer(dt);
                     this.updateReticle();
                 }
                 
