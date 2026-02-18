@@ -1,339 +1,244 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="antialiased">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AETHERIS ARCHITECT | Final Cut</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 fill=%22%23050505%22/><path d=%22M14 10 H30 V18 H22 V46 H30 V54 H14 Z M50 10 H34 V18 H42 V46 H34 V54 H50 Z%22 fill=%22%23ffffff%22/><rect x=%2226%22 y=%2226%22 width=%2212%22 height=%2212%22 fill=%22%2300d9ff%22/></svg>">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Aetheris Architect - Expérience WebGL 3D Interactive">
+    <title>AETHERIS ARCHITECT | Stable Build</title>
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Favicon SVG Optimisé -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 fill=%22%23050505%22/><path d=%22M14 10 H30 V18 H22 V46 H30 V54 H14 Z M50 10 H34 V18 H42 V46 H34 V54 H50 Z%22 fill=%22%23ffffff%22/><rect x=%2226%22 y=%2226%22 width=%2212%22 height=%2212%22 fill=%22%2300d9ff%22/></svg>">
+    
+    <!-- Préchargement des polices -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS (CDN pour la démo, build process recommandé en prod) -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
+        /* --- CORE DESIGN TOKENS --- */
         :root {
             --color-void: #050505;
-            --color-concrete: #8a8a8a;
             --color-interface: rgba(255, 255, 255, 0.9);
-            --color-accent: #ff3e3e;
             --color-success: #00ffaa;
             --color-energy: #00d9ff;
+            --color-alert: #ff3e3e;
+            --easing-smooth: cubic-bezier(0.22, 1, 0.36, 1);
         }
 
+        /* --- BASE RESET & UTILS --- */
         body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
             background-color: var(--color-void);
             overflow: hidden;
             font-family: 'Inter', sans-serif;
-            cursor: none;
-            user-select: none;
-        }
-
-        #ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
+            cursor: none; /* Immersif par défaut */
             height: 100%;
-            pointer-events: none;
-            z-index: 10;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            transition: opacity 1s ease;
+            width: 100%;
         }
 
+        /* Curseur visible sur les écrans de menu */
+        body.cursor-active { cursor: auto; }
+
+        /* --- SCANLINES & FX --- */
         #scanlines {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
             background-size: 100% 4px;
             pointer-events: none;
-            z-index: 5;
-            opacity: 0.3;
+            mix-blend-mode: overlay;
+        }
+
+        #vignette {
+            background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.6) 100%);
+            pointer-events: none;
+        }
+
+        /* --- HUD COMPONENTS --- */
+        .hud-panel {
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(5, 5, 5, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-left: 2px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
         }
 
         .hud-text {
-            font-family: 'JetBrains Mono', monospace;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            font-size: 0.75rem;
-            color: var(--color-interface);
             text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-            background: rgba(0,0,0,0.4);
-            padding: 8px 12px;
-            backdrop-filter: blur(4px);
-            border-left: 2px solid rgba(255,255,255,0.2);
         }
 
+        /* --- RETICLE SYSTEM --- */
         #reticle {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 4px;
-            height: 4px;
-            background: white;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            transition: all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            mix-blend-mode: exclusion;
-            box-shadow: 0 0 10px white;
-            z-index: 20;
+            transition: width 0.2s var(--easing-smooth), 
+                        height 0.2s var(--easing-smooth), 
+                        border-radius 0.2s var(--easing-smooth),
+                        transform 0.1s linear;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
         
         #reticle.hover {
-            width: 30px;
-            height: 30px;
+            width: 2rem; height: 2rem;
             background: transparent;
             border: 2px solid var(--color-energy);
             border-radius: 4px;
-            transform: translate(-50%, -50%) rotate(0deg);
+            box-shadow: 0 0 15px var(--color-energy);
         }
 
         #reticle.holding {
-            width: 40px;
-            height: 40px;
+            width: 2.5rem; height: 2.5rem;
             background: transparent;
             border: 2px solid var(--color-success);
             border-radius: 50%;
-            transform: translate(-50%, -50%) scale(1.1);
+            transform: translate(-50%, -50%) scale(0.9);
             box-shadow: 0 0 20px var(--color-success);
         }
 
-        #objective-bar {
-            width: 300px;
-            height: 4px;
-            background: rgba(255,255,255,0.1);
-            margin-top: 10px;
-            position: relative;
-        }
+        /* --- ANIMATIONS --- */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
         
-        #objective-fill {
-            height: 100%;
-            width: 0%;
-            background: var(--color-success);
-            transition: width 0.5s ease;
-            box-shadow: 0 0 10px var(--color-success);
-        }
+        .animate-fade-in { animation: fadeIn 1s var(--easing-smooth) forwards; }
+        .animate-pulse-slow { animation: pulse 3s infinite ease-in-out; }
 
-        /* --- STYLES DU MENU PRINCIPAL --- */
-        #start-screen, #cycle-screen, #ending-screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(5, 5, 5, 0.95);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            pointer-events: auto;
-            backdrop-filter: blur(20px);
-            transition: opacity 1s ease-out;
-        }
-        
-        #cycle-screen, #ending-screen { display: none; pointer-events: none; }
-        #ending-screen { background: white; pointer-events: auto; }
-
-        .btn-main {
-            border: 1px solid rgba(255,255,255,0.3);
-            background: rgba(0,0,0,0.5);
-            color: white;
-            padding: 15px 40px;
-            font-family: 'JetBrains Mono', monospace;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 20px;
-        }
-        .btn-main:hover {
-            background: white;
-            color: black;
-            box-shadow: 0 0 20px rgba(255,255,255,0.5);
-        }
-
-        .btn-restart {
-            border: 1px solid rgba(0,0,0,0.3);
-            background: transparent;
-            color: black;
-            padding: 15px 40px;
-            font-family: 'JetBrains Mono', monospace;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 40px;
-            opacity: 0;
-            animation: fadeIn 2s forwards 4s; /* Apparait tard */
-        }
-        .btn-restart:hover {
-            background: black;
-            color: white;
-        }
-
+        /* --- LEVEL BUTTONS --- */
         .level-btn {
+            transition: all 0.2s var(--easing-smooth);
             border: 1px solid rgba(255,255,255,0.1);
-            background: rgba(0,0,0,0.3);
-            padding: 15px;
-            text-align: left;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
         .level-btn:hover {
             background: rgba(255,255,255,0.1);
-            border-left: 4px solid var(--hover-color, white);
-            padding-left: 20px;
-        }
-        .level-number {
-            font-family: 'JetBrains Mono', monospace;
-            color: rgba(255,255,255,0.5);
-            font-size: 0.8em;
-        }
-        .level-name {
-            font-family: 'Inter', sans-serif;
-            letter-spacing: 2px;
-            text-transform: uppercase;
+            transform: translateX(5px);
+            border-left-width: 4px;
         }
 
-        .loader-bar { width: 200px; height: 2px; background: #333; margin-top: 20px; position: relative; overflow: hidden; display: none; }
-        .loader-progress { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: white; animation: load 2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-        @keyframes load { to { width: 100%; } }
-        .fade-in { animation: fadeIn 2s ease forwards; opacity: 0; }
-        @keyframes fadeIn { to { opacity: 1; } }
-
-        #success-message {
-            position: absolute;
-            top: 40%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            opacity: 0;
-            transition: opacity 1s;
-        }
-        #success-message.visible { opacity: 1; }
-        
-        #controls-hint {
-            position: absolute;
-            bottom: 20%;
-            left: 50%;
-            transform: translateX(-50%);
-            color: rgba(255,255,255,0.6);
-            font-size: 0.8rem;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            text-align: center;
-            opacity: 0;
-            transition: opacity 0.5s;
-        }
-        #controls-hint.visible { opacity: 1; }
-
-        /* Effet de fondu blanc pour la fin */
-        #white-fade {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: white;
-            z-index: 90;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 5s ease-in;
+        /* --- LOADING BAR --- */
+        .loader-progress {
+            transition: width 0.2s linear;
+            box-shadow: 0 0 15px rgba(255,255,255,0.5);
         }
     </style>
 </head>
-<body>
+<body class="cursor-active">
 
-    <div id="scanlines"></div>
-    <div id="white-fade"></div>
+    <!-- FX Layers -->
+    <div id="scanlines" class="fixed inset-0 z-20 opacity-30 pointer-events-none"></div>
+    <div id="vignette" class="fixed inset-0 z-10 pointer-events-none"></div>
+    <div id="white-fade" class="fixed inset-0 bg-white z-[90] pointer-events-none opacity-0 transition-opacity duration-[5000ms] ease-in"></div>
 
-    <div id="ui-layer">
-        <div class="flex justify-between p-8 w-full items-start">
-            <div>
-                <div class="hud-text border-l-4 !border-white">
-                    OBJECTIF<br>
-                    <span class="text-xs text-gray-400">CONNECTER LES NOYAUX AUX SOCLES</span>
-                    <div id="objective-bar"><div id="objective-fill"></div></div>
-                    <div class="mt-2 text-xs tracking-widest text-[var(--color-success)]" id="objective-count">0/3</div>
+    <!-- UI Layer (HUD) -->
+    <div id="ui-layer" class="fixed inset-0 z-30 pointer-events-none opacity-0 flex flex-col justify-between p-4 md:p-8 transition-opacity duration-1000">
+        
+        <!-- Top HUD -->
+        <div class="flex justify-between items-start w-full">
+            <div class="hud-panel p-3 md:p-4 border-l-4 !border-white">
+                <div class="hud-text text-xs md:text-sm tracking-widest text-white uppercase mb-1">Objectif</div>
+                <div class="text-[10px] md:text-xs text-gray-400 tracking-wider mb-2">CONNECTER NOYAUX AUX SOCLES</div>
+                <div class="w-48 md:w-64 h-1 bg-white/10 rounded overflow-hidden">
+                    <div id="objective-fill" class="h-full w-0 bg-[var(--color-success)] shadow-[0_0_10px_var(--color-success)] transition-all duration-500"></div>
+                </div>
+                <div id="objective-count" class="mt-2 text-xs font-mono text-[var(--color-success)] tracking-widest text-right">0/3</div>
+            </div>
+
+            <div class="hud-panel p-3 md:p-4 text-right">
+                <div class="hud-text text-xs md:text-sm text-white tracking-widest">ARCHITECT_OS <span class="text-[var(--color-energy)]">v3.0</span></div>
+                <div class="text-[10px] md:text-xs text-gray-400 mt-1">CYCLE: <span id="cycle-display" class="text-white">--</span></div>
+            </div>
+        </div>
+
+        <!-- Center Reticle & Messages -->
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full text-center pointer-events-none">
+            <div id="success-message" class="opacity-0 transition-opacity duration-500 transform translate-y-4">
+                <h1 class="text-4xl md:text-6xl text-[var(--color-success)] font-thin tracking-[0.5em] mb-2 blur-[1px]">SYNCHRONISÉ</h1>
+                <p class="text-xs md:text-sm tracking-[0.8em] text-white uppercase">Structure Stabilisée</p>
+            </div>
+        </div>
+
+        <div id="reticle" class="absolute top-1/2 left-1/2 w-1 h-1 bg-white rounded-full -translate-x-1/2 -translate-y-1/2 mix-blend-exclusion"></div>
+
+        <div id="controls-hint" class="absolute bottom-1/4 left-1/2 -translate-x-1/2 text-[10px] md:text-xs text-white/60 tracking-widest uppercase opacity-0 transition-opacity duration-300">
+            [Clic Gauche] Maintenir pour saisir
+        </div>
+
+        <!-- Bottom HUD -->
+        <div class="flex justify-between items-end w-full">
+            <div class="hud-panel p-3 md:p-4 hidden md:block">
+                <div class="hud-text text-[10px] text-gray-300 leading-relaxed">
+                    [WASD/ZQSD] MOUVEMENT<br>
+                    [ESPACE] SAUT<br>
+                    [SOURIS] ORIENTATION
                 </div>
             </div>
-            <div class="hud-text text-right">
-                ARCHITECT_OS v2.5<br>
-                CYCLE: <span id="cycle-display">--</span>
-            </div>
-        </div>
-
-        <div id="success-message">
-            <h1 class="text-6xl text-white font-thin tracking-[1em] mb-4 text-[var(--color-success)]">SYNCHRONISÉ</h1>
-            <p class="text-sm tracking-widest text-white">STRUCTURE STABILISÉE.</p>
-        </div>
-
-        <div id="controls-hint">CLIC GAUCHE MAINTENU POUR SAISIR</div>
-        <div id="reticle"></div>
-
-        <div class="flex justify-between p-8 w-full items-end">
-            <div class="hud-text">
-                [ZQSD] BOUGER &nbsp; [ESPACE] SAUT<br>
-                [CLIC GAUCHE] SAISIR/LÂCHER OBJET
-            </div>
-            <div id="perf-monitor" class="hud-text text-right">
-                FPS: <span id="fps-counter">60</span><br>
-                GRAVITÉ: STABLE
+            
+            <div class="hud-panel p-3 md:p-4 text-right">
+                <div class="hud-text text-[10px] md:text-xs text-gray-400">
+                    FPS: <span id="fps-counter" class="text-white">60</span><br>
+                    PHYSIQUE: <span class="text-[var(--color-success)]">ACTIVE</span>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Écran de début / Menu Principal -->
-    <div id="start-screen">
-        <div id="boot-sequence" class="flex flex-col items-center">
-            <h1 class="text-6xl font-thin tracking-[0.5em] text-white mb-8 fade-in">AETHERIS</h1>
-            <button id="init-btn" class="btn-main fade-in" style="animation-delay: 0.5s;">
-                INITIALISER LE SYSTÈME
-            </button>
-            <div id="loader" class="loader-bar">
-                <div class="loader-progress"></div>
-            </div>
-            <p id="loading-text" class="hud-text text-gray-500 mt-4 text-xs tracking-widest hidden">CHARGEMENT MODULE PHYSIQUE...</p>
-        </div>
-
-        <div id="level-selector" class="hidden flex-col items-center w-full max-w-5xl px-8 fade-in">
-            <h2 class="text-2xl text-white tracking-[0.5em] mb-8 border-b border-gray-800 pb-4 w-full text-center">SÉLECTION DU PROTOCOLE</h2>
-            <div id="level-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-                <!-- Les boutons sont générés ici par JS -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Écran de transition -->
-    <div id="cycle-screen">
-        <h1 id="cycle-title" class="text-4xl font-light tracking-[0.3em] text-white mb-4">CYCLE TERMINÉ</h1>
-        <p class="hud-text text-[var(--color-energy)]">RECONFIGURATION DE L'ARCHITECTURE...</p>
-    </div>
-
-    <!-- Écran de FIN MAGISTRALE -->
-    <div id="ending-screen">
-        <h1 class="text-7xl font-thin tracking-[0.2em] text-black mb-4 fade-in" style="animation-duration: 4s;">AETHERIS</h1>
-        <p class="text-xl tracking-[0.5em] text-gray-500 uppercase fade-in" style="animation-delay: 2s; animation-duration: 3s;">Architecture Complète</p>
+    <!-- Start Screen -->
+    <div id="start-screen" class="fixed inset-0 z-50 bg-[#050505]/95 backdrop-blur-xl flex flex-col items-center justify-center transition-opacity duration-500">
         
-        <div class="mt-12 text-center fade-in" style="animation-delay: 3s;">
-            <p class="text-sm font-bold text-black uppercase tracking-widest mb-2">Architecte Principal</p>
-            <p class="text-lg text-gray-600 mb-8">Samyn-Antoy ABASSE</p>
+        <div id="boot-sequence" class="flex flex-col items-center text-center max-w-lg px-4">
+            <h1 class="text-5xl md:text-7xl font-thin tracking-[0.3em] text-white mb-8 animate-fade-in select-none">AETHERIS</h1>
+            
+            <div id="mobile-warning" class="hidden mb-6 p-4 border border-yellow-500/30 bg-yellow-500/10 rounded text-yellow-200 text-xs tracking-widest text-left">
+                ⚠️ ATTENTION: Ce terminal nécessite un clavier et une souris pour naviguer dans l'architecture. L'expérience tactile n'est pas supportée.
+            </div>
 
-            <p class="text-sm font-bold text-black uppercase tracking-widest mb-2">Direction Artistique</p>
-            <p class="text-lg text-gray-600">TechNerdSam Interactive</p>
+            <button id="init-btn" class="group relative px-8 py-4 bg-white/5 border border-white/20 hover:bg-white hover:text-black hover:border-white transition-all duration-300 animate-fade-in" style="animation-delay: 0.2s">
+                <span class="font-mono tracking-[0.2em] text-sm md:text-base uppercase">Initialiser le Système</span>
+                <div class="absolute inset-0 bg-white/10 scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
+            </button>
+
+            <div id="loader-container" class="hidden w-64 mt-8">
+                <div class="h-0.5 bg-gray-800 w-full overflow-hidden relative">
+                    <div id="loader-bar" class="h-full bg-white w-0 absolute top-0 left-0"></div>
+                </div>
+                <p id="loading-text" class="font-mono text-[10px] text-gray-500 mt-2 tracking-widest animate-pulse-slow">INITIALISATION DU MOTEUR PHYSIQUE...</p>
+                <p id="error-text" class="hidden font-mono text-[10px] text-[var(--color-alert)] mt-2 tracking-widest"></p>
+            </div>
         </div>
 
-        <button onclick="location.reload()" class="btn-restart">REINITIALISER LE MONDE</button>
+        <div id="level-selector" class="hidden flex-col items-center w-full max-w-6xl px-4 md:px-8 h-[80vh] animate-fade-in">
+            <h2 class="text-xl md:text-2xl text-white tracking-[0.5em] mb-8 border-b border-white/10 pb-4 w-full text-center font-light">SÉLECTION DU PROTOCOLE</h2>
+            <div id="level-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full overflow-y-auto pr-2 custom-scrollbar">
+                <!-- JS Generated -->
+            </div>
+        </div>
     </div>
 
+    <!-- Transition Screen -->
+    <div id="cycle-screen" class="fixed inset-0 z-40 bg-black flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-500">
+        <h1 class="text-3xl md:text-5xl font-light tracking-[0.3em] text-white mb-4 text-center">CYCLE TERMINÉ</h1>
+        <p class="font-mono text-sm text-[var(--color-energy)] tracking-widest animate-pulse">RECONFIGURATION DE L'ARCHITECTURE...</p>
+    </div>
+
+    <!-- Ending Screen -->
+    <div id="ending-screen" class="hidden fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center opacity-0 transition-opacity duration-[2000ms]">
+        <h1 class="text-6xl md:text-8xl font-thin tracking-[0.1em] text-black mb-2 animate-fade-in">AETHERIS</h1>
+        <p class="text-sm md:text-xl tracking-[0.4em] text-gray-500 uppercase mb-12 animate-fade-in" style="animation-delay: 1s">Architecture Complète</p>
+        
+        <div class="text-center space-y-8 animate-fade-in" style="animation-delay: 2s">
+            <div>
+                <p class="text-xs font-bold text-black uppercase tracking-widest mb-1">Conception & Code</p>
+                <p class="text-base text-gray-600 font-light">Samyn-Antoy ABASSE</p>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-black uppercase tracking-widest mb-1">Production</p>
+                <p class="text-base text-gray-600 font-light">TechNerdSam Interactive</p>
+            </div>
+        </div>
+
+        <button onclick="location.reload()" class="mt-16 px-8 py-3 border border-black text-black hover:bg-black hover:text-white transition-colors duration-300 font-mono tracking-widest text-sm uppercase opacity-0 animate-fade-in" style="animation-delay: 4s; animation-fill-mode: forwards;">
+            Réinitialiser
+        </button>
+    </div>
+
+    <!-- Import Map pour la stabilité des versions -->
     <script type="importmap">
         {
             "imports": {
@@ -348,17 +253,22 @@
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
         import RAPIER from '@dimforge/rapier3d-compat';
-        
+
+        /* --- CONFIGURATION & CONSTANTES --- */
         const CONFIG = {
             fov: 80,
-            renderDistance: 500, // Augmenté pour la fin
+            renderDistance: 500,
             playerSpeed: 12.0,
             playerJump: 18.0, 
             gravity: { x: 0.0, y: -30.0, z: 0.0 },
             grabDistance: 15.0, 
             holdDistance: 4.0,  
             magnetRadius: 4.0,  
-            maxCycles: 7
+            maxCycles: 7,
+            colors: {
+                success: 0x00ffaa,
+                void: 0x050505
+            }
         };
 
         const CYCLES_DATA = [
@@ -371,18 +281,32 @@
             { fog: 0xeeeeee, light: 0xffffff, accent: 0x000000, concrete: 0xffffff, name: "LUMIÈRE" }
         ];
 
+        /* --- AUDIO MANAGER (Robuste) --- */
         class AudioManager {
             constructor() {
-                this.initialized = false;
                 this.ctx = null;
-                this.ambience = null;
+                this.masterGain = null;
+                this.initialized = false;
             }
 
             async init() {
-                if(this.initialized) return;
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                this.ctx = new AudioContext();
-                
+                if (this.initialized) return;
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                    this.masterGain = this.ctx.createGain();
+                    this.masterGain.gain.value = 0.5; // Protection oreilles
+                    this.masterGain.connect(this.ctx.destination);
+                    this.createAmbience();
+                    this.initialized = true;
+                    if(this.ctx.state === 'suspended') await this.ctx.resume();
+                } catch (e) {
+                    console.warn("Audio init failed:", e);
+                }
+            }
+
+            createAmbience() {
+                if(!this.ctx) return;
                 const bufferSize = 2 * this.ctx.sampleRate;
                 const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                 const output = noiseBuffer.getChannelData(0);
@@ -395,102 +319,81 @@
                     output[i] *= 3.5; 
                 }
                 
-                this.ambience = this.ctx.createBufferSource();
-                this.ambience.buffer = noiseBuffer;
-                this.ambience.loop = true;
+                const node = this.ctx.createBufferSource();
+                node.buffer = noiseBuffer;
+                node.loop = true;
                 const gain = this.ctx.createGain();
                 gain.gain.value = 0.03;
-                this.ambience.connect(gain);
-                gain.connect(this.ctx.destination);
-                this.ambience.start();
-                this.initialized = true;
+                node.connect(gain);
+                gain.connect(this.masterGain);
+                node.start();
             }
 
-            triggerGrab() {
-                if(!this.initialized) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(200, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.2);
-                gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.2);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.3);
-            }
-
-            triggerSuccess() {
-                if(!this.initialized) return;
-                [440, 554, 659].forEach((freq, i) => {
-                    const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.value = freq;
-                    gain.gain.setValueAtTime(0, this.ctx.currentTime);
-                    gain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + 0.1 + (i*0.05));
-                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 3);
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    osc.start();
-                    osc.stop(this.ctx.currentTime + 3);
-                });
-            }
-            
-            triggerCycleComplete() {
-                if(!this.initialized) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(110, this.ctx.currentTime);
-                osc.frequency.linearRampToValueAtTime(55, this.ctx.currentTime + 2);
-                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 4);
+            playTone(type) {
+                if (!this.initialized || !this.ctx) return;
+                const t = this.ctx.currentTime;
                 
-                const filter = this.ctx.createBiquadFilter();
-                filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(1000, this.ctx.currentTime);
-                filter.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 2);
-
-                osc.connect(filter);
-                filter.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 4);
-            }
-
-            // Son de fin majestueux
-            triggerEnding() {
-                if(!this.initialized) return;
-                // Accord final
-                const freqs = [220, 277.18, 329.63, 440, 554.37, 880];
-                const now = this.ctx.currentTime;
-                
-                freqs.forEach((f, i) => {
+                if (type === 'grab') {
                     const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.value = f;
-                    gain.gain.setValueAtTime(0, now);
-                    gain.gain.linearRampToValueAtTime(0.05, now + 2 + (i*0.5));
-                    gain.gain.exponentialRampToValueAtTime(0.001, now + 10);
-                    
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    osc.start();
-                    osc.stop(now + 12);
-                });
+                    const g = this.ctx.createGain();
+                    osc.frequency.setValueAtTime(200, t);
+                    osc.frequency.exponentialRampToValueAtTime(600, t + 0.2);
+                    g.gain.setValueAtTime(0.05, t);
+                    g.gain.linearRampToValueAtTime(0, t + 0.2);
+                    osc.connect(g); g.connect(this.masterGain);
+                    osc.start(); osc.stop(t + 0.3);
+                } 
+                else if (type === 'success') {
+                    [440, 554, 659].forEach((f, i) => {
+                        const osc = this.ctx.createOscillator();
+                        const g = this.ctx.createGain();
+                        osc.frequency.value = f;
+                        g.gain.setValueAtTime(0, t);
+                        g.gain.linearRampToValueAtTime(0.05, t + 0.1 + (i*0.05));
+                        g.gain.exponentialRampToValueAtTime(0.001, t + 3);
+                        osc.connect(g); g.connect(this.masterGain);
+                        osc.start(); osc.stop(t + 3);
+                    });
+                }
+                else if (type === 'cycle') {
+                    const osc = this.ctx.createOscillator();
+                    const g = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(110, t);
+                    osc.frequency.linearRampToValueAtTime(55, t + 2);
+                    g.gain.setValueAtTime(0.1, t);
+                    g.gain.exponentialRampToValueAtTime(0.001, t + 4);
+                    const f = this.ctx.createBiquadFilter();
+                    f.frequency.setValueAtTime(1000, t);
+                    f.frequency.exponentialRampToValueAtTime(100, t + 2);
+                    osc.connect(f); f.connect(g); g.connect(this.masterGain);
+                    osc.start(); osc.stop(t + 4);
+                }
+                else if (type === 'ending') {
+                    const freqs = [220, 277.18, 329.63, 440, 554.37, 880];
+                    freqs.forEach((f, i) => {
+                        const osc = this.ctx.createOscillator();
+                        const g = this.ctx.createGain();
+                        osc.frequency.value = f;
+                        g.gain.setValueAtTime(0, t);
+                        g.gain.linearRampToValueAtTime(0.05, t + 2 + (i*0.5));
+                        g.gain.exponentialRampToValueAtTime(0.001, t + 10);
+                        osc.connect(g); g.connect(this.masterGain);
+                        osc.start(); osc.stop(t + 12);
+                    });
+                }
             }
         }
 
-        class ProceduralArchitect {
+        /* --- MATERIAL FACTORY --- */
+        class MaterialFactory {
             constructor() {
-                this.materials = {}; 
+                this.store = {};
             }
 
-            setPalette(palette) {
-                this.materials = {
+            updatePalette(palette) {
+                // Disposal des anciens matériaux si nécessaire (pour la mémoire)
+                this.store = {
                     concrete: new THREE.MeshStandardMaterial({
                         color: palette.concrete,
                         roughness: 0.9,
@@ -515,84 +418,104 @@
                     accentColor: palette.accent
                 };
             }
-
-            createSocketMesh() {
-                const geometry = new THREE.CylinderGeometry(3.5, 3.5, 0.4, 32); 
-                const mesh = new THREE.Mesh(geometry, this.materials.socket.clone());
-                mesh.receiveShadow = true;
-                return mesh;
-            }
-
-            createCoreMesh() {
-                const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-                const mesh = new THREE.Mesh(geometry, this.materials.core.clone());
-                mesh.castShadow = true;
-                const light = new THREE.PointLight(this.materials.accentColor, 2, 8);
-                mesh.add(light);
-                return mesh;
-            }
         }
 
-        class App {
+        /* --- GAME ENGINE (Core) --- */
+        class GameEngine {
             constructor() {
-                this.ready = false;
-                this.currentCycle = 1;
+                this.state = 'MENU'; // MENU, PLAYING, TRANSITION, ENDING
                 this.container = document.body;
                 this.clock = new THREE.Clock();
                 this.audio = new AudioManager();
-                this.architect = new ProceduralArchitect();
+                this.mats = new MaterialFactory();
                 
-                this.physicsWorld = null;
-                this.characterController = null; 
+                // Physics
+                this.world = null;
+                this.playerBody = null;
+                this.characterController = null;
                 
-                this.levelObjects = []; 
-                this.sockets = []; 
-                this.cores = []; 
-                this.endingParticles = null;
-                this.isEnding = false;
-
-                this.characterBody = null;
-                this.characterCollider = null;
+                // Scene
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.controls = null;
                 
+                // Game Data
+                this.objects = [];
+                this.sockets = [];
+                this.cores = [];
+                this.currentCycle = 1;
                 this.score = 0;
-                this.maxScore = 3; 
                 
+                // Interaction
                 this.raycaster = new THREE.Raycaster();
-                this.mouse = new THREE.Vector2(0,0);
-                
-                this.verticalVelocity = 0;
-                this.canJump = false;
-                
                 this.heldObject = null;
-                this.isMouseDown = false;
-                
-                this.keys = {
-                    ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
-                    KeyW: false, KeyS: false, KeyA: false, KeyD: false, Space: false
-                };
+                this.input = { up: false, down: false, left: false, right: false, jump: false, click: false };
+                this.velY = 0;
 
-                this.isGameRunning = false;
+                // Bindings
+                this.loop = this.loop.bind(this);
+                this.onResize = this.onResize.bind(this);
+                this.onKeyDown = this.onKeyDown.bind(this);
+                this.onKeyUp = this.onKeyUp.bind(this);
+                this.onMouseDown = this.onMouseDown.bind(this);
+                this.onMouseUp = this.onMouseUp.bind(this);
             }
 
-            async initPhysics() {
-                await RAPIER.init();
-                this.physicsWorld = new RAPIER.World(CONFIG.gravity);
+            /* --- INITIALIZATION --- */
+            async boot() {
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                if (isMobile) document.getElementById('mobile-warning').style.display = 'block';
+
+                document.getElementById('init-btn').addEventListener('click', async () => {
+                    document.getElementById('init-btn').style.display = 'none';
+                    const loader = document.getElementById('loader-container');
+                    const bar = document.getElementById('loader-bar');
+                    loader.style.display = 'block';
+
+                    try {
+                        // 1. Audio Init (Requires user gesture)
+                        await this.audio.init();
+                        bar.style.width = '30%';
+
+                        // 2. Physics Init (Async)
+                        await RAPIER.init();
+                        this.world = new RAPIER.World(CONFIG.gravity);
+                        bar.style.width = '70%';
+
+                        // 3. Graphics Init
+                        this.initGraphics();
+                        this.initInputs();
+                        bar.style.width = '100%';
+
+                        // 4. Launch Menu
+                        setTimeout(() => this.showLevelSelect(), 500);
+
+                    } catch (err) {
+                        console.error(err);
+                        document.getElementById('loading-text').style.display = 'none';
+                        const errTxt = document.getElementById('error-text');
+                        errTxt.innerText = "ERREUR CRITIQUE: " + err.message;
+                        errTxt.style.display = 'block';
+                    }
+                });
             }
 
             initGraphics() {
                 this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x000000); 
-                this.scene.fog = new THREE.FogExp2(0x000000, 0.02);
+                this.scene.background = new THREE.Color(CONFIG.colors.void);
+                this.scene.fog = new THREE.FogExp2(CONFIG.colors.void, 0.02);
 
                 this.camera = new THREE.PerspectiveCamera(CONFIG.fov, window.innerWidth / window.innerHeight, 0.1, CONFIG.renderDistance);
-                this.camera.position.set(0, 2, 0);
-
+                
                 this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Perf cap
                 this.renderer.shadowMap.enabled = true;
                 this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                 this.container.appendChild(this.renderer.domElement);
 
+                // Lighting
                 this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
                 this.scene.add(this.hemiLight);
 
@@ -600,6 +523,7 @@
                 this.dirLight.position.set(30, 80, 40);
                 this.dirLight.castShadow = true;
                 this.dirLight.shadow.mapSize.set(2048, 2048);
+                // Optimisation shadow volume
                 const d = 100;
                 this.dirLight.shadow.camera.left = -d;
                 this.dirLight.shadow.camera.right = d;
@@ -607,231 +531,311 @@
                 this.dirLight.shadow.camera.bottom = -d;
                 this.scene.add(this.dirLight);
 
+                window.addEventListener('resize', this.onResize);
+                
+                // Controls
                 this.controls = new PointerLockControls(this.camera, document.body);
-                
-                document.addEventListener('mousedown', (e) => {
-                    if(e.button === 0) { 
-                        if (this.isGameRunning && this.ready && !this.isEnding) {
-                            if (!this.controls.isLocked) {
-                                this.controls.lock();
-                            } else {
-                                this.isMouseDown = true;
-                                this.tryGrabObject();
-                            }
-                        }
-                    }
-                });
-
-                document.addEventListener('mouseup', () => {
-                    this.isMouseDown = false;
-                    this.releaseObject();
-                });
-
                 this.controls.addEventListener('lock', () => {
-                    if(this.isGameRunning && !this.isEnding) {
-                        document.getElementById('ui-layer').style.opacity = '1';
-                        document.getElementById('start-screen').style.display = 'none';
-                        this.resetKeys();
+                    this.state = 'PLAYING';
+                    document.getElementById('ui-layer').style.opacity = '1';
+                    document.getElementById('start-screen').style.display = 'none';
+                    document.body.classList.remove('cursor-active');
+                });
+                this.controls.addEventListener('unlock', () => {
+                    if (this.state !== 'ENDING' && this.state !== 'TRANSITION') {
+                        // Pause logic could go here
+                        document.body.classList.add('cursor-active');
                     }
                 });
-                
-                window.addEventListener('resize', () => {
-                    this.camera.aspect = window.innerWidth / window.innerHeight;
-                    this.camera.updateProjectionMatrix();
-                    this.renderer.setSize(window.innerWidth, window.innerHeight);
-                });
-
-                window.addEventListener('blur', () => this.resetKeys());
             }
 
-            resetKeys() {
-                for(let k in this.keys) this.keys[k] = false;
-                this.isMouseDown = false;
-                this.releaseObject();
+            initInputs() {
+                document.addEventListener('keydown', this.onKeyDown);
+                document.addEventListener('keyup', this.onKeyUp);
+                document.addEventListener('mousedown', this.onMouseDown);
+                document.addEventListener('mouseup', this.onMouseUp);
+            }
+
+            /* --- LEVEL LOGIC --- */
+            showLevelSelect() {
+                const ui = document.getElementById('boot-sequence');
+                const selector = document.getElementById('level-selector');
+                const grid = document.getElementById('level-grid');
+                
+                ui.style.display = 'none';
+                selector.style.display = 'flex';
+                grid.innerHTML = '';
+
+                CYCLES_DATA.forEach((cycle, idx) => {
+                    const btn = document.createElement('div');
+                    btn.className = "level-btn bg-white/5 p-4 cursor-pointer flex justify-between items-center group relative overflow-hidden";
+                    
+                    const hex = '#' + cycle.accent.toString(16).padStart(6, '0');
+                    
+                    btn.innerHTML = `
+                        <div class="relative z-10">
+                            <div class="font-mono text-xs text-gray-500 mb-1 group-hover:text-white transition-colors">CYCLE_0${idx + 1}</div>
+                            <div class="text-sm md:text-base text-white tracking-widest uppercase font-light">${cycle.name}</div>
+                        </div>
+                        <div class="text-xl relative z-10 transition-transform group-hover:translate-x-1" style="color: ${hex}">►</div>
+                        <div class="absolute inset-0 bg-gradient-to-r from-transparent to-[${hex}] opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
+                    `;
+                    btn.onclick = () => this.loadLevel(idx + 1);
+                    grid.appendChild(btn);
+                });
             }
 
             clearLevel() {
-                this.releaseObject();
-                this.isEnding = false;
-                if(this.endingParticles) {
-                    this.scene.remove(this.endingParticles);
-                    this.endingParticles = null;
-                }
-
-                this.levelObjects.forEach(obj => {
+                // Cleanup Physics
+                if (this.heldObject) this.releaseObject();
+                this.objects.forEach(obj => {
                     if(obj.mesh) {
                         this.scene.remove(obj.mesh);
                         if(obj.mesh.geometry) obj.mesh.geometry.dispose();
                     }
-                    if(obj.body) {
-                        this.physicsWorld.removeRigidBody(obj.body);
-                    }
+                    if(obj.body) this.world.removeRigidBody(obj.body);
                 });
-                
-                if(this.characterBody) {
-                    this.physicsWorld.removeRigidBody(this.characterBody);
-                    this.characterBody = null;
-                }
-                
-                if(this.characterController) {
-                    this.physicsWorld.removeCharacterController(this.characterController);
-                    this.characterController = null;
+                if(this.playerBody) {
+                    this.world.removeRigidBody(this.playerBody);
+                    this.world.removeCharacterController(this.characterController);
                 }
 
-                this.levelObjects = [];
+                this.objects = [];
                 this.sockets = [];
                 this.cores = [];
                 this.score = 0;
                 
-                document.getElementById('objective-fill').style.width = `0%`;
-                document.getElementById('objective-count').innerText = `0/${this.maxScore}`;
-                document.getElementById('success-message').classList.remove('visible');
+                // UI Reset
+                document.getElementById('objective-fill').style.width = '0%';
+                document.getElementById('objective-count').innerText = '0/3';
+                document.getElementById('success-message').classList.remove('opacity-100');
+                document.getElementById('success-message').classList.add('opacity-0');
             }
 
-            loadCycle(cycleIndex) {
-                this.ready = false;
+            loadLevel(index) {
                 this.clearLevel();
-                this.currentCycle = cycleIndex;
+                this.currentCycle = index;
+                this.state = 'PLAYING';
                 
-                const data = CYCLES_DATA[cycleIndex - 1];
-                this.architect.setPalette(data);
+                // Setup Environment
+                const data = CYCLES_DATA[index - 1];
+                this.mats.updatePalette(data);
                 
-                this.scene.background = new THREE.Color(data.fog);
+                this.scene.background.setHex(data.fog);
                 this.scene.fog.color.setHex(data.fog);
                 this.dirLight.color.setHex(data.light);
                 this.hemiLight.color.setHex(data.light);
                 
                 document.documentElement.style.setProperty('--color-energy', '#' + data.accent.toString(16).padStart(6, '0'));
-                document.getElementById('cycle-display').innerText = `${cycleIndex} / ${CONFIG.maxCycles} - ${data.name}`;
+                document.getElementById('cycle-display').innerText = `${index} / ${CONFIG.maxCycles}`;
+
+                // Init Player
+                const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 5, 0);
+                this.playerBody = this.world.createRigidBody(bodyDesc);
+                const collider = RAPIER.ColliderDesc.capsule(0.5, 0.4);
+                this.world.createCollider(collider, this.playerBody);
+                this.characterController = this.world.createCharacterController(0.1);
+                this.characterController.enableAutostep(0.7, 0.3, true);
+                this.characterController.enableSnapToGround(0.5);
+                this.characterController.setMaxSlopeClimbAngle(50 * Math.PI / 180);
+
+                this.buildArchitecture(index);
+
+                // UI Transitions
+                document.getElementById('start-screen').style.display = 'none';
+                document.getElementById('cycle-screen').style.opacity = '0';
+                this.controls.lock();
                 
-                this.buildGeometry(cycleIndex);
-                this.initPlayer();
-                
-                this.ready = true;
+                if (!this.clock.running) {
+                    this.clock.start();
+                    this.loop();
+                }
             }
 
-            buildGeometry(cycle) {
-                const floorGeo = new THREE.BoxGeometry(160, 2, 160);
-                const floorMesh = new THREE.Mesh(floorGeo, this.architect.materials.concrete);
-                floorMesh.position.y = -1;
-                floorMesh.receiveShadow = true;
-                this.scene.add(floorMesh);
-                const floorBody = this.physicsWorld.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -1, 0));
-                this.physicsWorld.createCollider(RAPIER.ColliderDesc.cuboid(80, 1, 80), floorBody);
-                this.levelObjects.push({ mesh: floorMesh, body: floorBody });
-
-                const createWall = (x, z, w, h, d) => {
-                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this.architect.materials.concrete);
+            buildArchitecture(cycle) {
+                // Helpers
+                const addWall = (x, z, w, h, d) => {
+                    const geo = new THREE.BoxGeometry(w, h, d);
+                    const mesh = new THREE.Mesh(geo, this.mats.store.concrete);
                     mesh.position.set(x, h/2, z);
-                    mesh.castShadow = true;
-                    mesh.receiveShadow = true;
+                    mesh.castShadow = true; mesh.receiveShadow = true;
                     this.scene.add(mesh);
-                    const body = this.physicsWorld.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x, h/2, z));
-                    this.physicsWorld.createCollider(RAPIER.ColliderDesc.cuboid(w/2, h/2, d/2), body);
-                    this.levelObjects.push({ mesh, body });
+                    
+                    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x, h/2, z));
+                    this.world.createCollider(RAPIER.ColliderDesc.cuboid(w/2, h/2, d/2), body);
+                    this.objects.push({ mesh, body });
                 };
 
-                createWall(0, -80, 160, 20, 10);
-                createWall(0, 80, 160, 20, 10);
-                createWall(-80, 0, 10, 20, 160);
-                createWall(80, 0, 10, 20, 160);
+                // Floor
+                const floorGeo = new THREE.BoxGeometry(160, 2, 160);
+                const floorMesh = new THREE.Mesh(floorGeo, this.mats.store.concrete);
+                floorMesh.position.y = -1; floorMesh.receiveShadow = true;
+                this.scene.add(floorMesh);
+                const floorBody = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -1, 0));
+                this.world.createCollider(RAPIER.ColliderDesc.cuboid(80, 1, 80), floorBody);
+                this.objects.push({ mesh: floorMesh, body: floorBody });
 
-                let spawnPoints = [];
-                let socketPoints = [];
+                // Boundaries
+                addWall(0, -80, 160, 20, 10); addWall(0, 80, 160, 20, 10);
+                addWall(-80, 0, 10, 20, 160); addWall(80, 0, 10, 20, 160);
 
-                // ... Level generation logic (kept the same as per Ground Update) ...
-                if (cycle === 1) {
-                    socketPoints = [{x: 0, z: 15}, {x: -15, z: 0}, {x: 15, z: 0}];
-                    spawnPoints = [{x: 0, z: -10}, {x: -10, z: -10}, {x: 10, z: -10}];
-                } else if (cycle === 2) {
-                    createWall(0, 0, 20, 6, 20); 
-                    socketPoints = [{x: 30, z: 30}, {x: -30, z: 30}, {x: 0, z: -40}];
-                    spawnPoints = [{x: 30, z: -30}, {x: -30, z: -30}, {x: 0, z: 40}];
-                } else if (cycle === 3) {
-                    createWall(-20, 0, 5, 8, 60); createWall(20, 0, 5, 8, 60);
-                    socketPoints = [{x: 0, z: 50}, {x: -40, z: 0}, {x: 40, z: 0}];
-                    spawnPoints = [{x: 0, z: -30}, {x: -40, z: 20}, {x: 40, z: 20}];
-                } else if (cycle === 4) {
-                    createWall(0, 20, 80, 6, 5); createWall(0, -20, 80, 6, 5);
-                    socketPoints = [{x: 50, z: 0}, {x: -50, z: 0}, {x: 0, z: 50}];
-                    spawnPoints = [{x: 0, z: 0}, {x: 20, z: 0}, {x: -20, z: 0}];
-                } else if (cycle === 5) {
-                    createWall(25, 25, 5, 8, 20); createWall(40, 15, 20, 8, 5); 
-                    createWall(-25, -25, 5, 8, 20); createWall(-40, -15, 20, 8, 5);
-                    createWall(10, -10, 4, 12, 4); createWall(-10, 10, 4, 12, 4);
-                    socketPoints = [{x: 35, z: 35}, {x: -35, z: -35}, {x: 0, z: 0}];
-                    spawnPoints = [{x: 0, z: 40}, {x: 0, z: -40}, {x: 0, z: 0}]; 
-                } else if (cycle === 6) {
-                    createWall(0, 30, 20, 30, 20); createWall(-50, 0, 10, 20, 10); createWall(50, 0, 10, 20, 10);
-                    socketPoints = [{x: 0, z: -40}, {x: -40, z: 20}, {x: 40, z: 20}];
-                    spawnPoints = [{x: 0, z: 50}, {x: -50, z: -10}, {x: 50, z: -10}];
-                } else if (cycle === 7) {
-                    for(let z=-40; z<=40; z+=20) {
-                        createWall(20, z, 2, 10, 2); createWall(-20, z, 2, 10, 2); 
-                    }
-                    socketPoints = [{x: 0, z: 30}, {x: 0, z: 0}, {x: 0, z: -30}];
-                    spawnPoints = [{x: 5, z: 30}, {x: -5, z: 0}, {x: 5, z: -30}];
-                } else {
-                     socketPoints = [{x: 0, z: 20}, {x: 20, z: -20}, {x: -20, z: -20}];
-                     spawnPoints = [{x: 0, z: 0}, {x: 0, z: 0}, {x: 0, z: 0}];
+                // Level Spec
+                let sockets = [], spawns = [];
+                switch(cycle) {
+                    case 1:
+                        sockets = [{x:0, z:15}, {x:-15, z:0}, {x:15, z:0}];
+                        spawns = [{x:0, z:-10}, {x:-10, z:-10}, {x:10, z:-10}];
+                        break;
+                    case 2:
+                        addWall(0, 0, 20, 6, 20);
+                        sockets = [{x:30, z:30}, {x:-30, z:30}, {x:0, z:-40}];
+                        spawns = [{x:30, z:-30}, {x:-30, z:-30}, {x:0, z:40}];
+                        break;
+                    case 3:
+                        addWall(-20, 0, 5, 8, 60); addWall(20, 0, 5, 8, 60);
+                        sockets = [{x:0, z:50}, {x:-40, z:0}, {x:40, z:0}];
+                        spawns = [{x:0, z:-30}, {x:-40, z:20}, {x:40, z:20}];
+                        break;
+                    case 4:
+                        addWall(0, 20, 80, 6, 5); addWall(0, -20, 80, 6, 5);
+                        sockets = [{x:50, z:0}, {x:-50, z:0}, {x:0, z:50}];
+                        spawns = [{x:0, z:0}, {x:20, z:0}, {x:-20, z:0}];
+                        break;
+                    case 5:
+                        addWall(25, 25, 5, 8, 20); addWall(40, 15, 20, 8, 5);
+                        addWall(-25, -25, 5, 8, 20); addWall(-40, -15, 20, 8, 5);
+                        addWall(10, -10, 4, 12, 4); addWall(-10, 10, 4, 12, 4);
+                        sockets = [{x:35, z:35}, {x:-35, z:-35}, {x:0, z:0}];
+                        spawns = [{x:0, z:40}, {x:0, z:-40}, {x:0, z:0}];
+                        break;
+                    case 6:
+                        addWall(0, 30, 20, 30, 20); addWall(-50, 0, 10, 20, 10); addWall(50, 0, 10, 20, 10);
+                        sockets = [{x:0, z:-40}, {x:-40, z:20}, {x:40, z:20}];
+                        spawns = [{x:0, z:50}, {x:-50, z:-10}, {x:50, z:-10}];
+                        break;
+                    case 7:
+                        for(let z=-40; z<=40; z+=20) { addWall(20, z, 2, 10, 2); addWall(-20, z, 2, 10, 2); }
+                        sockets = [{x:0, z:30}, {x:0, z:0}, {x:0, z:-30}];
+                        spawns = [{x:5, z:30}, {x:-5, z:0}, {x:5, z:-30}];
+                        break;
+                    default:
+                        sockets = [{x:0, z:10}, {x:10, z:-10}, {x:-10, z:-10}]; spawns = [{x:0,z:0},{x:0,z:0},{x:0,z:0}];
                 }
 
+                // Place Interactive Elements
                 for(let i=0; i<3; i++) {
-                    const sp = socketPoints[i] || {x: i*15, z: 0};
-                    const sMesh = this.architect.createSocketMesh();
-                    sMesh.position.set(sp.x, 0.2, sp.z);
+                    // Socket
+                    const sp = sockets[i] || {x: i*10, z:0};
+                    const sGeo = new THREE.CylinderGeometry(3.5, 3.5, 0.4, 32);
+                    const sMesh = new THREE.Mesh(sGeo, this.mats.store.socket.clone());
+                    sMesh.position.set(sp.x, 0.2, sp.z); sMesh.receiveShadow = true;
                     this.scene.add(sMesh);
-                    
-                    const beamGeo = new THREE.ConeGeometry(3, 60, 32, 1, true);
-                    const beamMat = new THREE.MeshBasicMaterial({ color: this.architect.materials.accentColor, transparent: true, opacity: 0.1, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
-                    const beam = new THREE.Mesh(beamGeo, beamMat);
+
+                    // Beam
+                    const bGeo = new THREE.ConeGeometry(3, 60, 32, 1, true);
+                    const bMat = new THREE.MeshBasicMaterial({ color: this.mats.store.accentColor, transparent: true, opacity: 0.1, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+                    const beam = new THREE.Mesh(bGeo, bMat);
                     beam.position.set(sp.x, 30, sp.z);
                     this.scene.add(beam);
-                    
-                    this.sockets.push({ mesh: sMesh, beam, pos: new THREE.Vector3(sp.x, 1, sp.z), active: false, idx: i });
-                    this.levelObjects.push({ mesh: sMesh, body: null });
-                    this.levelObjects.push({ mesh: beam, body: null });
 
-                    const cp = spawnPoints[i] || {x: 0, z: 0};
-                    const cMesh = this.architect.createCoreMesh();
-                    cMesh.position.set(cp.x, 5, cp.z);
+                    this.sockets.push({ mesh: sMesh, beam, pos: new THREE.Vector3(sp.x, 1, sp.z), active: false });
+                    this.objects.push({ mesh: sMesh, body: null }, { mesh: beam, body: null });
+
+                    // Core
+                    const cp = spawns[i] || {x:0, z:0};
+                    const cGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+                    const cMesh = new THREE.Mesh(cGeo, this.mats.store.core.clone());
+                    cMesh.position.set(cp.x, 5, cp.z); cMesh.castShadow = true;
+                    cMesh.add(new THREE.PointLight(this.mats.store.accentColor, 2, 8));
                     this.scene.add(cMesh);
-                    
-                    const cBodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(cp.x, 5, cp.z).setLinearDamping(2.0).setAngularDamping(2.0).setCanSleep(false);
-                    const cBody = this.physicsWorld.createRigidBody(cBodyDesc);
-                    const cCollider = RAPIER.ColliderDesc.cuboid(0.75, 0.75, 0.75).setRestitution(0.1).setFriction(2.0).setDensity(5.0);
-                    this.physicsWorld.createCollider(cCollider, cBody);
-                    
-                    this.cores.push({ mesh: cMesh, body: cBody, id: i, locked: false });
-                    this.levelObjects.push({ mesh: cMesh, body: cBody });
+
+                    const cBody = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(cp.x, 5, cp.z).setLinearDamping(2.0).setAngularDamping(2.0).setCanSleep(false));
+                    this.world.createCollider(RAPIER.ColliderDesc.cuboid(0.75, 0.75, 0.75).setRestitution(0.1).setFriction(2.0).setDensity(5.0), cBody);
+
+                    this.cores.push({ mesh: cMesh, body: cBody, locked: false });
+                    this.objects.push({ mesh: cMesh, body: cBody });
                 }
             }
 
-            initPlayer() {
-                const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 5, 0);
-                this.characterBody = this.physicsWorld.createRigidBody(bodyDesc);
-                const colliderDesc = RAPIER.ColliderDesc.capsule(0.5, 0.4).setTranslation(0, 0, 0);
-                this.characterCollider = this.physicsWorld.createCollider(colliderDesc, this.characterBody);
-                const offset = 0.1;
-                this.characterController = this.physicsWorld.createCharacterController(offset);
-                this.characterController.enableAutostep(0.7, 0.3, true); 
-                this.characterController.enableSnapToGround(0.5); 
-                this.characterController.setMaxSlopeClimbAngle(50 * Math.PI / 180);
-                this.camera.position.set(0, 2, 0);
-                this.verticalVelocity = 0;
+            /* --- GAMEPLAY LOOP --- */
+            loop() {
+                requestAnimationFrame(this.loop);
+                
+                const dt = Math.min(this.clock.getDelta(), 0.1); // Clamp dt for safety
+                if(this.state !== 'PLAYING' && this.state !== 'ENDING') return;
+
+                // Physics Step
+                this.world.step();
+
+                // 1. Update Player
+                if (this.state === 'PLAYING') {
+                    const dir = new THREE.Vector3();
+                    const fwd = new THREE.Vector3();
+                    const right = new THREE.Vector3();
+                    
+                    this.camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+                    right.crossVectors(fwd, new THREE.Vector3(0,1,0)).normalize();
+
+                    if(this.input.up) dir.add(fwd);
+                    if(this.input.down) dir.sub(fwd);
+                    if(this.input.right) dir.add(right);
+                    if(this.input.left) dir.sub(right);
+
+                    if(dir.lengthSq() > 0) dir.normalize().multiplyScalar(CONFIG.playerSpeed * dt);
+
+                    const grounded = this.characterController.computedGrounded();
+                    if(grounded) {
+                        this.velY = -2.0;
+                        if(this.input.jump) this.velY = CONFIG.playerJump;
+                    } else {
+                        this.velY += CONFIG.gravity.y * dt * 2.0;
+                    }
+
+                    this.characterController.computeColliderMovement(this.world.getCollider(this.playerBody.collider(0)), { x: dir.x, y: this.velY * dt, z: dir.z });
+                    const m = this.characterController.computedMovement();
+                    const pos = this.playerBody.translation();
+                    this.playerBody.setNextKinematicTranslation({ x: pos.x + m.x, y: pos.y + m.y, z: pos.z + m.z });
+                    this.camera.position.set(pos.x + m.x, pos.y + m.y + 0.8, pos.z + m.z);
+
+                    // Grab Interaction
+                    if(this.input.click && !this.heldObject) this.tryGrab();
+                    if(!this.input.click && this.heldObject) this.releaseObject();
+                    this.updateHeldObject(dt);
+                    this.updateReticle();
+                }
+
+                // 2. Sync Objects
+                this.cores.forEach(c => {
+                    if (!c.locked) {
+                        const t = c.body.translation();
+                        const r = c.body.rotation();
+                        c.mesh.position.set(t.x, t.y, t.z);
+                        c.mesh.quaternion.set(r.x, r.y, r.z, r.w);
+                        this.checkMagnetism(c);
+                    }
+                });
+
+                // 3. Ending Animation
+                if (this.state === 'ENDING' && this.endingParticles) {
+                    this.endingParticles.rotation.y += 0.001;
+                    this.endingParticles.position.y += 0.1;
+                    this.camera.position.y += 0.05;
+                }
+
+                this.renderer.render(this.scene, this.camera);
             }
 
-            tryGrabObject() {
-                if(this.heldObject) return;
+            /* --- INTERACTION --- */
+            tryGrab() {
                 this.raycaster.setFromCamera(new THREE.Vector2(0,0), this.camera);
-                const interactables = this.cores.filter(c => !c.locked).map(c => c.mesh);
-                const intersects = this.raycaster.intersectObjects(interactables);
-                if(intersects.length > 0 && intersects[0].distance < CONFIG.grabDistance) {
-                    const hitObj = intersects[0].object;
-                    const core = this.cores.find(c => c.mesh === hitObj || c.mesh === hitObj.parent);
-                    if(core && !core.locked) {
+                const candidates = this.cores.filter(c => !c.locked).map(c => c.mesh);
+                const hits = this.raycaster.intersectObjects(candidates);
+                
+                if(hits.length > 0 && hits[0].distance < CONFIG.grabDistance) {
+                    const core = this.cores.find(c => c.mesh === hits[0].object || c.mesh === hits[0].object.parent);
+                    if(core) {
                         this.heldObject = core;
-                        this.audio.triggerGrab();
+                        this.audio.playTone('grab');
                         document.getElementById('reticle').classList.add('holding');
                         core.body.wakeUp();
                     }
@@ -847,294 +851,174 @@
 
             updateHeldObject(dt) {
                 if(!this.heldObject) return;
-                const holdPos = new THREE.Vector3();
-                this.camera.getWorldDirection(holdPos);
-                holdPos.multiplyScalar(CONFIG.holdDistance);
-                holdPos.add(this.camera.position);
-                const corePos = this.heldObject.body.translation();
-                const coreVec = new THREE.Vector3(corePos.x, corePos.y, corePos.z);
-                const dir = new THREE.Vector3().subVectors(holdPos, coreVec);
-                const dist = dir.length();
-                if(dist > 10) { this.releaseObject(); return; }
-                dir.normalize().multiplyScalar(dist * 800 * dt); 
-                this.heldObject.body.setLinvel({x: dir.x, y: dir.y, z: dir.z}, true);
+                const target = new THREE.Vector3();
+                this.camera.getWorldDirection(target);
+                target.multiplyScalar(CONFIG.holdDistance).add(this.camera.position);
+                
+                const current = this.heldObject.body.translation();
+                const dist = new THREE.Vector3(target.x - current.x, target.y - current.y, target.z - current.z);
+                
+                if (dist.length() > 10) { this.releaseObject(); return; }
+                
+                dist.multiplyScalar(800 * dt);
+                this.heldObject.body.setLinvel({x: dist.x, y: dist.y, z: dist.z}, true);
                 this.heldObject.body.setAngvel({x:0, y:0, z:0}, true);
-                this.heldObject.body.setRotation({x:0, y:0, z:0, w:1}, true); 
+                this.heldObject.body.setRotation({x:0, y:0, z:0, w:1}, true);
             }
 
-            applyMagnetism(core) {
-                if(core.locked || this.heldObject === core) return;
-                let closestSocket = null;
+            checkMagnetism(core) {
+                if(this.heldObject === core) return;
+                
+                let bestSocket = null;
                 let minDist = CONFIG.magnetRadius;
-                this.sockets.forEach(socket => {
-                    if (socket.active) return;
-                    const dist = core.mesh.position.distanceTo(socket.pos);
-                    if (dist < minDist) { minDist = dist; closestSocket = socket; }
+
+                this.sockets.forEach(s => {
+                    if(s.active) return;
+                    const d = core.mesh.position.distanceTo(s.pos);
+                    if(d < minDist) { minDist = d; bestSocket = s; }
                 });
-                if (closestSocket) {
-                    const corePos = core.body.translation();
-                    const forceDir = new THREE.Vector3(closestSocket.pos.x - corePos.x, closestSocket.pos.y - corePos.y, closestSocket.pos.z - corePos.z).normalize();
-                    core.body.applyImpulse({x: forceDir.x * 0.5, y: -0.1, z: forceDir.z * 0.5}, true);
-                    if (minDist < 1.5) { this.lockCore(core, closestSocket); }
-                }
-            }
 
-            lockCore(core, socket) {
-                if(this.heldObject === core) this.releaseObject();
-                const playerPos = this.characterBody.translation();
-                const distToPlayer = new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z).distanceTo(socket.pos);
-                if(distToPlayer < 2.5) {
-                    const pushDir = new THREE.Vector3(playerPos.x - socket.pos.x, 0, playerPos.z - socket.pos.z).normalize();
-                    this.characterBody.setNextKinematicTranslation({x: playerPos.x + pushDir.x * 2, y: playerPos.y + 0.5, z: playerPos.z + pushDir.z * 2});
-                }
-                core.locked = true;
-                socket.active = true;
-                this.score++;
-                core.body.setBodyType(RAPIER.RigidBodyType.Fixed);
-                core.body.setTranslation(socket.pos, true);
-                core.body.setRotation({x:0, y:0, z:0, w:1}, true);
-                core.mesh.position.copy(socket.pos);
-                core.mesh.rotation.set(0,0,0);
-                core.mesh.material.color.setHex(CONFIG.colors?.success || 0x00ffaa);
-                core.mesh.material.emissive.setHex(CONFIG.colors?.success || 0x00ffaa);
-                core.mesh.material.emissiveIntensity = 1;
-                socket.beam.material.color.setHex(CONFIG.colors?.success || 0x00ffaa);
-                socket.beam.material.opacity = 0.5;
-                this.audio.triggerSuccess();
-                this.updateUI();
-                if(this.score >= this.maxScore) { this.completeCycle(); }
-            }
+                if(bestSocket) {
+                    const cPos = core.body.translation();
+                    const dir = new THREE.Vector3(bestSocket.pos.x - cPos.x, bestSocket.pos.y - cPos.y, bestSocket.pos.z - cPos.z).normalize();
+                    core.body.applyImpulse({x: dir.x*0.5, y: -0.1, z: dir.z*0.5}, true);
 
-            completeCycle() {
-                if (this.currentCycle < CONFIG.maxCycles) {
-                    // Transition normale
-                    this.audio.triggerCycleComplete();
-                    const screen = document.getElementById('cycle-screen');
-                    screen.style.display = 'flex';
-                    screen.style.opacity = '1';
-                    
-                    setTimeout(() => {
-                        this.currentCycle++;
-                        this.loadCycle(this.currentCycle);
+                    if(minDist < 1.5) {
+                        // Success Lock
+                        core.locked = true;
+                        bestSocket.active = true;
+                        this.score++;
                         
-                        setTimeout(() => {
-                            screen.style.opacity = '0';
-                            setTimeout(() => screen.style.display = 'none', 1000);
-                        }, 500);
-                    }, 3000);
-                } else {
-                    // FIN MAGISTRALE DU CYCLE 7
-                    this.triggerFinalSequence();
-                }
-            }
+                        core.body.setBodyType(RAPIER.RigidBodyType.Fixed);
+                        core.body.setTranslation(bestSocket.pos, true);
+                        core.body.setRotation({x:0,y:0,z:0,w:1}, true);
+                        core.mesh.position.copy(bestSocket.pos);
+                        core.mesh.rotation.set(0,0,0);
+                        
+                        // Visuals
+                        const successColor = CONFIG.colors.success;
+                        core.mesh.material.color.setHex(successColor);
+                        core.mesh.material.emissive.setHex(successColor);
+                        core.mesh.material.emissiveIntensity = 1;
+                        bestSocket.beam.material.color.setHex(successColor);
+                        bestSocket.beam.material.opacity = 0.5;
 
-            triggerFinalSequence() {
-                this.isEnding = true;
-                this.controls.unlock(); // Relâche la souris
-                document.getElementById('ui-layer').style.opacity = '0'; // Cache le HUD
-                this.audio.triggerEnding();
-
-                // 1. Désactiver la gravité pour tout le monde
-                this.physicsWorld.gravity = {x: 0, y: 0.5, z: 0}; // Légère gravité inversée
-                
-                // 2. Création de particules d'ascension
-                const geometry = new THREE.BufferGeometry();
-                const vertices = [];
-                for(let i=0; i<2000; i++) {
-                    vertices.push(
-                        (Math.random() - 0.5) * 100,
-                        Math.random() * 50,
-                        (Math.random() - 0.5) * 100
-                    );
-                }
-                geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-                const material = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2, transparent: true, opacity: 0.8 });
-                this.endingParticles = new THREE.Points(geometry, material);
-                this.scene.add(this.endingParticles);
-
-                // 3. Animation de la lumière
-                const targetColor = new THREE.Color(0xffffff);
-                const duration = 5000; // 5 secondes
-                let startTime = Date.now();
-
-                const animateEnding = () => {
-                    const elapsed = Date.now() - startTime;
-                    const alpha = Math.min(elapsed / duration, 1);
-                    
-                    // La scène devient blanche
-                    this.scene.background.lerp(targetColor, 0.01);
-                    this.scene.fog.color.lerp(targetColor, 0.01);
-                    this.scene.fog.density += 0.0005;
-
-                    // La caméra s'élève doucement
-                    this.camera.position.y += 0.1;
-                    this.camera.lookAt(0, 100, 0);
-
-                    // Les particules montent
-                    if(this.endingParticles) {
-                        this.endingParticles.position.y += 0.2;
-                        this.endingParticles.rotation.y += 0.001;
+                        this.audio.playTone('success');
+                        
+                        // UI Update
+                        const pct = (this.score / 3) * 100;
+                        document.getElementById('objective-fill').style.width = `${pct}%`;
+                        document.getElementById('objective-count').innerText = `${this.score}/3`;
+                        
+                        if(this.score >= 3) this.completeLevel();
                     }
-
-                    if(alpha < 1) {
-                        requestAnimationFrame(animateEnding);
-                    } else {
-                        // Écran blanc final
-                        document.getElementById('white-fade').style.opacity = '1';
-                        setTimeout(() => {
-                             document.getElementById('ending-screen').style.display = 'flex';
-                             document.getElementById('ending-screen').style.opacity = '1';
-                        }, 2000);
-                    }
-                };
-                
-                animateEnding();
-            }
-
-            triggerWin() {
-                // Déprécié au profit de triggerFinalSequence pour le cycle 7
-                document.getElementById('success-message').classList.add('visible');
-            }
-
-            updateUI() {
-                const pct = (this.score / this.maxScore) * 100;
-                document.getElementById('objective-fill').style.width = `${pct}%`;
-                document.getElementById('objective-count').innerText = `${this.score}/${this.maxScore}`;
+                }
             }
 
             updateReticle() {
-                if(this.heldObject || this.isEnding) return;
-
+                if(this.heldObject) return;
                 this.raycaster.setFromCamera(new THREE.Vector2(0,0), this.camera);
-                const interactables = this.cores.filter(c => !c.locked).map(c => c.mesh);
-                const intersects = this.raycaster.intersectObjects(interactables);
-                const reticle = document.getElementById('reticle');
-                const hint = document.getElementById('controls-hint');
+                const candidates = this.cores.filter(c => !c.locked).map(c => c.mesh);
+                const hits = this.raycaster.intersectObjects(candidates);
+                const r = document.getElementById('reticle');
+                const h = document.getElementById('controls-hint');
                 
-                if(intersects.length > 0 && intersects[0].distance < CONFIG.grabDistance) {
-                    reticle.classList.add('hover');
-                    hint.classList.add('visible');
+                if(hits.length > 0 && hits[0].distance < CONFIG.grabDistance) {
+                    r.classList.add('hover');
+                    h.classList.remove('opacity-0');
                 } else {
-                    reticle.classList.remove('hover');
-                    hint.classList.remove('visible');
+                    r.classList.remove('hover');
+                    h.classList.add('opacity-0');
                 }
             }
 
-            updatePlayer(dt) {
-                if(!this.controls.isLocked) return;
-
-                const moveVector = new THREE.Vector3(0, 0, 0);
-                const forward = new THREE.Vector3();
-                const right = new THREE.Vector3();
-                this.camera.getWorldDirection(forward); forward.y = 0; forward.normalize();
-                right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-
-                if (this.keys['KeyW'] || this.keys['ArrowUp']) moveVector.add(forward);
-                if (this.keys['KeyS'] || this.keys['ArrowDown']) moveVector.sub(forward);
-                if (this.keys['KeyD'] || this.keys['ArrowRight']) moveVector.add(right);
-                if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveVector.sub(right);
-
-                if (moveVector.lengthSq() > 0) { moveVector.normalize().multiplyScalar(CONFIG.playerSpeed * dt); }
-
-                const grounded = this.characterController.computedGrounded();
-                if (grounded) { this.verticalVelocity = -2.0; this.canJump = true; } 
-                else { this.verticalVelocity += CONFIG.gravity.y * dt * 2.0; this.canJump = false; }
-                if (this.keys['Space'] && grounded) { this.verticalVelocity = CONFIG.playerJump; }
-
-                this.characterController.computeColliderMovement(this.characterCollider, { x: moveVector.x, y: this.verticalVelocity * dt, z: moveVector.z });
-                const correctedMovement = this.characterController.computedMovement();
-                const currentPos = this.characterBody.translation();
-                this.characterBody.setNextKinematicTranslation({x: currentPos.x + correctedMovement.x, y: currentPos.y + correctedMovement.y, z: currentPos.z + correctedMovement.z});
-                this.camera.position.set(currentPos.x + correctedMovement.x, currentPos.y + correctedMovement.y + 0.8, currentPos.z + correctedMovement.z);
+            completeLevel() {
+                document.getElementById('success-message').classList.remove('opacity-0');
+                document.getElementById('success-message').classList.add('opacity-100');
+                
+                if (this.currentCycle >= CONFIG.maxCycles) {
+                    setTimeout(() => this.triggerEnding(), 2000);
+                } else {
+                    setTimeout(() => {
+                        this.state = 'TRANSITION';
+                        this.audio.playTone('cycle');
+                        const screen = document.getElementById('cycle-screen');
+                        screen.style.opacity = '1';
+                        
+                        setTimeout(() => {
+                            this.loadLevel(this.currentCycle + 1);
+                            screen.style.opacity = '0';
+                        }, 3000);
+                    }, 2000);
+                }
             }
 
-            animate() {
-                requestAnimationFrame(() => this.animate());
-                const dt = Math.min(this.clock.getDelta(), 0.05);
-                
-                if (this.ready && this.isGameRunning) {
-                    this.updateHeldObject(dt);
-                    this.physicsWorld.step();
-                    
-                    this.cores.forEach(c => {
-                        if(!c.locked) {
-                            const pos = c.body.translation();
-                            const rot = c.body.rotation();
-                            c.mesh.position.set(pos.x, pos.y, pos.z);
-                            c.mesh.quaternion.set(rot.x, rot.y, rot.z, rot.w);
-                            this.applyMagnetism(c);
-                        }
+            triggerEnding() {
+                this.state = 'ENDING';
+                this.controls.unlock();
+                document.getElementById('ui-layer').style.opacity = '0';
+                this.audio.playTone('ending');
+                this.world.gravity = {x:0, y:0.5, z:0}; // Zero-G ascent
+
+                // Particles
+                const geo = new THREE.BufferGeometry();
+                const pos = [];
+                for(let i=0; i<2000; i++) pos.push((Math.random()-0.5)*100, Math.random()*50, (Math.random()-0.5)*100);
+                geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+                const mat = new THREE.PointsMaterial({color: 0xffffff, size:0.2, transparent:true, opacity:0.8});
+                this.endingParticles = new THREE.Points(geo, mat);
+                this.scene.add(this.endingParticles);
+
+                // Fade to White
+                document.getElementById('white-fade').classList.remove('opacity-0');
+                setTimeout(() => {
+                    document.getElementById('ending-screen').style.display = 'flex';
+                    // Petit délai pour permettre au display flex de s'appliquer avant l'opacité
+                    requestAnimationFrame(() => {
+                         document.getElementById('ending-screen').classList.remove('opacity-0');
                     });
-                    
-                    if(!this.isEnding) this.updatePlayer(dt);
-                    this.updateReticle();
+                }, 5000);
+            }
+
+            /* --- EVENT HANDLERS --- */
+            onResize() {
+                if(!this.camera || !this.renderer) return;
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            onKeyDown(e) {
+                switch(e.code) {
+                    case 'KeyW': case 'ArrowUp': this.input.up = true; break;
+                    case 'KeyS': case 'ArrowDown': this.input.down = true; break;
+                    case 'KeyA': case 'ArrowLeft': this.input.left = true; break;
+                    case 'KeyD': case 'ArrowRight': this.input.right = true; break;
+                    case 'Space': this.input.jump = true; break;
                 }
-                
-                if(this.ready) { this.renderer.render(this.scene, this.camera); }
-            }
-            
-            async initializeSystem() {
-                const initBtn = document.getElementById('init-btn');
-                const loader = document.getElementById('loader');
-                const loadingText = document.getElementById('loading-text');
-
-                initBtn.style.display = 'none';
-                loader.style.display = 'block';
-                loadingText.style.display = 'block';
-                
-                await this.audio.init();
-                await this.initPhysics();
-                this.initGraphics();
-                setTimeout(() => { this.showLevelSelector(); }, 2000);
-            }
-            
-            showLevelSelector() {
-                const bootSeq = document.getElementById('boot-sequence');
-                const levelSel = document.getElementById('level-selector');
-                const grid = document.getElementById('level-grid');
-                bootSeq.style.display = 'none';
-                levelSel.style.display = 'flex';
-                
-                grid.innerHTML = '';
-                CYCLES_DATA.forEach((cycle, index) => {
-                    const btn = document.createElement('div');
-                    btn.className = 'level-btn';
-                    const colorHex = '#' + cycle.accent.toString(16).padStart(6, '0');
-                    btn.style.setProperty('--hover-color', colorHex);
-                    btn.innerHTML = `<div><div class="level-number">CYCLE_0${index + 1}</div><div class="level-name text-white">${cycle.name}</div></div><div style="color: ${colorHex}">►</div>`;
-                    btn.onclick = () => { this.launchGame(index + 1); };
-                    grid.appendChild(btn);
-                });
             }
 
-            launchGame(cycleIndex) {
-                this.isGameRunning = true;
-                this.isEnding = false;
-                this.loadCycle(cycleIndex);
-                document.getElementById('start-screen').style.display = 'none';
-                document.getElementById('ending-screen').style.display = 'none';
-                document.getElementById('white-fade').style.opacity = '0';
-                this.controls.lock();
-                if (!this.clock.running) this.clock.start();
-                this.animate();
+            onKeyUp(e) {
+                switch(e.code) {
+                    case 'KeyW': case 'ArrowUp': this.input.up = false; break;
+                    case 'KeyS': case 'ArrowDown': this.input.down = false; break;
+                    case 'KeyA': case 'ArrowLeft': this.input.left = false; break;
+                    case 'KeyD': case 'ArrowRight': this.input.right = false; break;
+                    case 'Space': this.input.jump = false; break;
+                }
             }
 
-            start() {
-                document.addEventListener('keydown', (e) => {
-                    if(this.keys.hasOwnProperty(e.code)) { this.keys[e.code] = true; if(e.code === "Space") e.preventDefault(); }
-                });
-                document.addEventListener('keyup', (e) => {
-                    if(this.keys.hasOwnProperty(e.code)) { this.keys[e.code] = false; }
-                });
-                this.animate();
-            }
+            onMouseDown(e) { if(e.button === 0) this.input.click = true; }
+            onMouseUp(e) { if(e.button === 0) this.input.click = false; }
         }
 
-        const app = new App();
-        window.app = app;
-        app.start(); 
-        
-        document.getElementById('init-btn').addEventListener('click', () => { app.initializeSystem(); });
+        // --- BOOTSTRAP ---
+        window.addEventListener('DOMContentLoaded', () => {
+            const game = new GameEngine();
+            window.game = game; // Debug access
+            game.boot();
+        });
+
     </script>
 </body>
 </html>
