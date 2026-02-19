@@ -134,17 +134,28 @@
             border-color: white;
         }
 
-        /* --- LOADING BAR --- */
-        .loader-progress {
-            transition: width 0.2s linear;
-            box-shadow: 0 0 15px rgba(255,255,255,0.5);
+        /* --- KEY GUIDES --- */
+        .key-badge {
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 0.7em;
+            background: rgba(255,255,255,0.1);
+            display: inline-block;
+            min-width: 24px;
+            text-align: center;
+            margin-right: 8px;
         }
-        
+
         /* --- UTILS --- */
         .blur-game {
             filter: blur(5px);
             transition: filter 0.3s ease;
         }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
     </style>
 </head>
 <body class="cursor-active">
@@ -185,25 +196,88 @@
         <div id="reticle" class="absolute top-1/2 left-1/2 w-1 h-1 bg-white rounded-full -translate-x-1/2 -translate-y-1/2 mix-blend-exclusion"></div>
 
         <div id="controls-hint" class="absolute bottom-1/4 left-1/2 -translate-x-1/2 text-[10px] md:text-xs text-white/60 tracking-widest uppercase opacity-0 transition-opacity duration-300">
-            [Clic Gauche] Maintenir pour saisir
+            [Clic Gauche] / [RT] Maintenir pour saisir
         </div>
 
         <!-- Bottom HUD -->
         <div class="flex justify-between items-end w-full">
             <div class="hud-panel p-3 md:p-4 hidden md:block">
-                <div class="hud-text text-[10px] text-gray-300 leading-relaxed">
-                    [WASD/ZQSD] MOUVEMENT<br>
-                    [ESPACE] SAUT<br>
-                    [SOURIS] ORIENTATION<br>
-                    [ÉCHAP] PAUSE
+                <div class="hud-text text-[10px] text-gray-300 leading-relaxed font-mono">
+                    <span class="text-[var(--color-energy)]">[H] / [SELECT]</span> AIDE<br>
+                    <span class="text-white">CLAVIER</span> / <span class="text-white">MANETTE</span> DÉTECTÉE
                 </div>
             </div>
             
             <div class="hud-panel p-3 md:p-4 text-right">
                 <div class="hud-text text-[10px] md:text-xs text-gray-400">
                     FPS: <span id="fps-counter" class="text-white">60</span><br>
-                    PHYSIQUE: <span class="text-[var(--color-success)]">ACTIVE</span>
+                    MANETTE: <span id="gamepad-status" class="text-gray-600">INACTIVE</span>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls Guide Overlay -->
+    <div id="controls-guide" class="hidden fixed inset-0 z-[70] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center animate-fade-in text-white pointer-events-none">
+        <div class="max-w-4xl w-full p-8 grid grid-cols-2 gap-12 pointer-events-auto">
+            <div class="col-span-2 text-center border-b border-white/10 pb-6 mb-2">
+                <h2 class="text-3xl font-thin tracking-[0.4em] uppercase">Guide des Commandes</h2>
+            </div>
+
+            <!-- Keyboard -->
+            <div class="space-y-6">
+                <h3 class="text-[var(--color-energy)] text-sm tracking-widest uppercase border-b border-[var(--color-energy)] pb-2 mb-4 w-max">Clavier / Souris</h3>
+                
+                <div class="flex items-center justify-between group">
+                    <span class="text-gray-400 text-sm">Déplacement</span>
+                    <div><span class="key-badge">W</span><span class="key-badge">A</span><span class="key-badge">S</span><span class="key-badge">D</span></div>
+                </div>
+                <div class="flex items-center justify-between group">
+                    <span class="text-gray-400 text-sm">Regarder</span>
+                    <div><span class="key-badge">SOURIS</span></div>
+                </div>
+                <div class="flex items-center justify-between group">
+                    <span class="text-gray-400 text-sm">Sauter</span>
+                    <div><span class="key-badge">ESPACE</span></div>
+                </div>
+                <div class="flex items-center justify-between group">
+                    <span class="text-gray-400 text-sm">Saisir Objet</span>
+                    <div><span class="key-badge">CLIC GAUCHE</span></div>
+                </div>
+                <div class="flex items-center justify-between group">
+                    <span class="text-gray-400 text-sm">Pause / Menu</span>
+                    <div><span class="key-badge">ÉCHAP</span></div>
+                </div>
+            </div>
+
+            <!-- Gamepad -->
+            <div class="space-y-6">
+                <h3 class="text-[var(--color-success)] text-sm tracking-widest uppercase border-b border-[var(--color-success)] pb-2 mb-4 w-max">Manette (Xbox/PS)</h3>
+                
+                <div class="flex items-center justify-between group">
+                    <span class="text-gray-400 text-sm">Déplacement</span>
+                    <div><span class="key-badge">STICK GAUCHE</span></div>
+                </div>
+                <div class="flex items-center justify-between group">
+                    <span class="text-gray-400 text-sm">Regarder</span>
+                    <div><span class="key-badge">STICK DROIT</span></div>
+                </div>
+                <div class="flex items-center justify-between group">
+                    <span class="text-gray-400 text-sm">Sauter</span>
+                    <div><span class="key-badge">A</span> / <span class="key-badge">X</span></div>
+                </div>
+                <div class="flex items-center justify-between group">
+                    <span class="text-gray-400 text-sm">Saisir Objet</span>
+                    <div><span class="key-badge">RT</span> / <span class="key-badge">R2</span></div>
+                </div>
+                <div class="flex items-center justify-between group">
+                    <span class="text-gray-400 text-sm">Pause / Menu</span>
+                    <div><span class="key-badge">START</span> / <span class="key-badge">OPTIONS</span></div>
+                </div>
+            </div>
+
+            <div class="col-span-2 text-center mt-8 pt-4 border-t border-white/10">
+                <button id="close-guide-btn" class="menu-btn max-w-xs mx-auto">FERMER [H]</button>
             </div>
         </div>
     </div>
@@ -217,6 +291,10 @@
                 Reprendre
             </button>
             
+            <button id="controls-btn" class="menu-btn text-[var(--color-energy)] border-[var(--color-energy)]/30 hover:border-[var(--color-energy)]">
+                Commandes
+            </button>
+
             <button id="restart-btn" class="menu-btn">
                 Recommencer Cycle
             </button>
@@ -234,7 +312,7 @@
             <h1 class="text-5xl md:text-7xl font-thin tracking-[0.3em] text-white mb-8 animate-fade-in select-none">AETHERIS</h1>
             
             <div id="mobile-warning" class="hidden mb-6 p-4 border border-yellow-500/30 bg-yellow-500/10 rounded text-yellow-200 text-xs tracking-widest text-left">
-                ⚠️ ATTENTION: Ce terminal nécessite un clavier et une souris pour naviguer dans l'architecture. L'expérience tactile n'est pas supportée.
+                ⚠️ ATTENTION: Ce terminal nécessite un clavier/souris ou une manette Xbox/PS pour naviguer.
             </div>
 
             <button id="init-btn" class="group relative px-8 py-4 bg-white/5 border border-white/20 hover:bg-white hover:text-black hover:border-white transition-all duration-300 animate-fade-in" style="animation-delay: 0.2s">
@@ -313,6 +391,7 @@
             holdDistance: 4.0,  
             magnetRadius: 4.0,  
             maxCycles: 7,
+            lookSensitivity: 2.0, // Sensibilité manette
             colors: {
                 success: 0x00ffaa,
                 void: 0x050505
@@ -498,8 +577,21 @@
                 // Interaction
                 this.raycaster = new THREE.Raycaster();
                 this.heldObject = null;
-                this.input = { up: false, down: false, left: false, right: false, jump: false, click: false };
+                this.input = { up: false, down: false, left: false, right: false, jump: false, click: false, showGuide: false };
                 this.velY = 0;
+                
+                // Jump Logic (Improved)
+                this.lastGroundedTime = 0;
+                this.jumpPressedTime = 0;
+                this.coyoteTime = 150; // ms
+                this.jumpBufferTime = 150; // ms
+
+                // Gamepad Specific
+                this.gamepadIndex = -1;
+                this.gamepadDeadzone = 0.15;
+                this.pauseButtonWasPressed = false;
+                this.grabButtonWasPressed = false;
+                this.guideButtonWasPressed = false;
 
                 // Bindings
                 this.loop = this.loop.bind(this);
@@ -508,12 +600,18 @@
                 this.onKeyUp = this.onKeyUp.bind(this);
                 this.onMouseDown = this.onMouseDown.bind(this);
                 this.onMouseUp = this.onMouseUp.bind(this);
+                this.onGamepadConnected = this.onGamepadConnected.bind(this);
+                this.onGamepadDisconnected = this.onGamepadDisconnected.bind(this);
             }
 
             /* --- INITIALIZATION --- */
             async boot() {
                 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                 if (isMobile) document.getElementById('mobile-warning').style.display = 'block';
+
+                // Gamepad Events
+                window.addEventListener("gamepadconnected", this.onGamepadConnected);
+                window.addEventListener("gamepaddisconnected", this.onGamepadDisconnected);
 
                 document.getElementById('init-btn').addEventListener('click', async () => {
                     document.getElementById('init-btn').style.display = 'none';
@@ -535,6 +633,7 @@
                         this.initGraphics();
                         this.initInputs();
                         this.initPauseMenu();
+                        this.initGuide();
                         bar.style.width = '100%';
 
                         // 4. Launch Menu
@@ -556,7 +655,9 @@
                 this.scene.fog = new THREE.FogExp2(CONFIG.colors.void, 0.02);
 
                 this.camera = new THREE.PerspectiveCamera(CONFIG.fov, window.innerWidth / window.innerHeight, 0.1, CONFIG.renderDistance);
-                
+                // IMPORTANT: Fixer l'ordre de rotation pour le comportement FPS
+                this.camera.rotation.order = 'YXZ'; 
+
                 this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Perf cap
@@ -610,7 +711,7 @@
             initPauseMenu() {
                 // Binding buttons
                 document.getElementById('resume-btn').onclick = () => {
-                    this.controls.lock(); // This triggers 'lock' event which sets state to PLAYING
+                    this.controls.lock(); 
                 };
                 
                 document.getElementById('restart-btn').onclick = () => {
@@ -630,11 +731,23 @@
                     this.showLevelSelect();
                     document.body.classList.add('cursor-active');
                 };
+
+                // Controls Button
+                document.getElementById('controls-btn').onclick = () => {
+                    document.getElementById('controls-guide').style.display = 'flex';
+                };
+            }
+
+            initGuide() {
+                document.getElementById('close-guide-btn').onclick = () => {
+                    document.getElementById('controls-guide').style.display = 'none';
+                };
             }
             
             togglePause(isPaused) {
                 const pauseScreen = document.getElementById('pause-screen');
                 const ui = document.getElementById('ui-layer');
+                const guide = document.getElementById('controls-guide');
                 
                 if (isPaused) {
                     this.state = 'PAUSED';
@@ -644,6 +757,7 @@
                 } else {
                     this.state = 'PLAYING';
                     pauseScreen.style.display = 'none';
+                    guide.style.display = 'none'; // Ensure guide closes on resume
                     ui.classList.remove('blur-game');
                     document.body.classList.remove('cursor-active');
                     this.clock.getDelta(); // Reset clock delta to prevent jump
@@ -857,6 +971,98 @@
                     this.objects.push({ mesh: cMesh, body: cBody });
                 }
             }
+            
+            /* --- GAMEPAD SUPPORT --- */
+            onGamepadConnected(e) {
+                this.gamepadIndex = e.gamepad.index;
+                const status = document.getElementById('gamepad-status');
+                status.innerText = "ACTIVE";
+                status.className = "text-[var(--color-success)]";
+                
+                // Mettre à jour l'indicateur UI
+                document.getElementById('controls-hint').innerText = "[RT] ou [X] Maintenir pour saisir";
+            }
+            
+            onGamepadDisconnected(e) {
+                if(this.gamepadIndex === e.gamepad.index) {
+                    this.gamepadIndex = -1;
+                    const status = document.getElementById('gamepad-status');
+                    status.innerText = "INACTIVE";
+                    status.className = "text-gray-600";
+                    document.getElementById('controls-hint').innerText = "[Clic Gauche] Maintenir pour saisir";
+                }
+            }
+
+            pollGamepad(dt) {
+                if (this.gamepadIndex === -1) return { moveX: 0, moveY: 0, gpJump: false };
+                
+                const gp = navigator.getGamepads()[this.gamepadIndex];
+                if (!gp) return { moveX: 0, moveY: 0, gpJump: false };
+
+                // Deadzone helper
+                const applyDeadzone = (v) => Math.abs(v) > this.gamepadDeadzone ? v : 0;
+
+                // 1. Movement (Left Stick - Axes 0 & 1)
+                const moveX = applyDeadzone(gp.axes[0]);
+                const moveY = applyDeadzone(gp.axes[1]); // Y is usually inverted but for forward we want -1 to be forward in logic sometimes, let's keep raw here
+
+                // 2. Camera (Right Stick - Axes 2 & 3)
+                const lookX = applyDeadzone(gp.axes[2]);
+                const lookY = applyDeadzone(gp.axes[3]);
+
+                if (lookX !== 0 || lookY !== 0) {
+                    // IMPORTANT: Manette Rotation Fix
+                    // On utilise YXZ pour que l'axe Y soit toujours "Up" du monde
+                    this.camera.rotation.y -= lookX * CONFIG.lookSensitivity * dt;
+                    this.camera.rotation.x -= lookY * CONFIG.lookSensitivity * dt;
+                    
+                    // Clamp Pitch (Prevent backflip) - 90 deg = 1.57 rad
+                    this.camera.rotation.x = Math.max( -1.5, Math.min( 1.5, this.camera.rotation.x ) );
+                }
+
+                // 3. Jump (Button 0 - A)
+                const isJumpPressed = gp.buttons[0].pressed;
+                if (isJumpPressed) {
+                    this.input.jump = true;
+                }
+                
+                // 4. Grab (Button 7 - RT or Button 2 - X)
+                const grabPressed = gp.buttons[7].value > 0.5 || gp.buttons[2].pressed;
+                
+                if (grabPressed && !this.grabButtonWasPressed) {
+                    this.input.click = true;
+                    this.grabButtonWasPressed = true;
+                } else if (!grabPressed && this.grabButtonWasPressed) {
+                    this.input.click = false;
+                    this.grabButtonWasPressed = false;
+                }
+
+                // 5. Pause (Button 9 - Start)
+                if (gp.buttons[9].pressed) {
+                    if (!this.pauseButtonWasPressed) {
+                        this.pauseButtonWasPressed = true;
+                        if (this.state === 'PLAYING') this.controls.unlock();
+                        else if (this.state === 'PAUSED') this.controls.lock();
+                    }
+                } else {
+                    this.pauseButtonWasPressed = false;
+                }
+                
+                // 6. Guide (Button 8 - Select/Back)
+                if (gp.buttons[8].pressed) {
+                    if (!this.guideButtonWasPressed) {
+                        this.guideButtonWasPressed = true;
+                        if(this.state === 'PLAYING') {
+                            this.controls.unlock();
+                            document.getElementById('controls-guide').style.display = 'flex';
+                        }
+                    }
+                } else {
+                    this.guideButtonWasPressed = false;
+                }
+
+                return { gpMoveX: moveX, gpMoveY: moveY, gpJump: isJumpPressed };
+            }
 
             /* --- GAMEPLAY LOOP --- */
             loop() {
@@ -876,32 +1082,68 @@
 
                 // 1. Update Player
                 if (this.state === 'PLAYING') {
+                    // Poll Gamepad
+                    const { gpMoveX, gpMoveY, gpJump } = this.pollGamepad(dt);
+
                     const dir = new THREE.Vector3();
                     const fwd = new THREE.Vector3();
                     const right = new THREE.Vector3();
                     
+                    // Get direction from camera for proper movement relative to look
                     this.camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
                     right.crossVectors(fwd, new THREE.Vector3(0,1,0)).normalize();
 
-                    if(this.input.up) dir.add(fwd);
-                    if(this.input.down) dir.sub(fwd);
-                    if(this.input.right) dir.add(right);
-                    if(this.input.left) dir.sub(right);
+                    // Keyboard Inputs
+                    let moveForward = 0;
+                    let moveRight = 0;
+                    if(this.input.up) moveForward += 1;
+                    if(this.input.down) moveForward -= 1;
+                    if(this.input.right) moveRight += 1;
+                    if(this.input.left) moveRight -= 1;
+
+                    // Gamepad Inputs (Merge)
+                    if (Math.abs(gpMoveY) > 0) moveForward -= gpMoveY; 
+                    if (Math.abs(gpMoveX) > 0) moveRight += gpMoveX;
+
+                    // Apply vectors
+                    if (moveForward !== 0) dir.add(fwd.multiplyScalar(moveForward));
+                    if (moveRight !== 0) dir.add(right.multiplyScalar(moveRight));
 
                     if(dir.lengthSq() > 0) dir.normalize().multiplyScalar(CONFIG.playerSpeed * dt);
 
+                    /* --- JUMP LOGIC (FIXED) --- */
                     const grounded = this.characterController.computedGrounded();
-                    if(grounded) {
-                        this.velY = -2.0;
-                        if(this.input.jump) this.velY = CONFIG.playerJump;
+                    const now = performance.now();
+                    
+                    // Coyote Time (remember last time we were grounded)
+                    if(grounded) this.lastGroundedTime = now;
+                    
+                    // Jump Buffering (remember last time we pressed jump)
+                    if((this.input.jump || gpJump) && !this.input.jumpConsumed) {
+                        this.jumpPressedTime = now;
+                        this.input.jumpConsumed = true; // Consume press to avoid continuous jump
+                    }
+                    if(!(this.input.jump || gpJump)) this.input.jumpConsumed = false;
+
+                    const timeSinceGrounded = now - this.lastGroundedTime;
+                    const timeSinceJump = now - this.jumpPressedTime;
+
+                    if (timeSinceJump < this.jumpBufferTime && timeSinceGrounded < this.coyoteTime) {
+                        this.velY = CONFIG.playerJump;
+                        this.jumpPressedTime = 0; // Consume jump
+                        this.lastGroundedTime = 0; // Prevent double jump
+                    } else if (grounded) {
+                        this.velY = -2.0; // Stick to ground
                     } else {
-                        this.velY += CONFIG.gravity.y * dt * 2.0;
+                        this.velY += CONFIG.gravity.y * dt * 2.0; // Gravity
                     }
 
                     this.characterController.computeColliderMovement(this.world.getCollider(this.playerBody.collider(0)), { x: dir.x, y: this.velY * dt, z: dir.z });
                     const m = this.characterController.computedMovement();
                     const pos = this.playerBody.translation();
                     this.playerBody.setNextKinematicTranslation({ x: pos.x + m.x, y: pos.y + m.y, z: pos.z + m.z });
+                    
+                    // Sync Camera Position
                     this.camera.position.set(pos.x + m.x, pos.y + m.y + 0.8, pos.z + m.z);
 
                     // Grab Interaction
@@ -1102,6 +1344,12 @@
                     case 'KeyA': case 'ArrowLeft': this.input.left = true; break;
                     case 'KeyD': case 'ArrowRight': this.input.right = true; break;
                     case 'Space': this.input.jump = true; break;
+                    case 'KeyH': 
+                        if(this.state === 'PLAYING') {
+                             this.controls.unlock();
+                             document.getElementById('controls-guide').style.display = 'flex';
+                        }
+                        break;
                 }
             }
 
