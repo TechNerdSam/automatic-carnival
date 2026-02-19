@@ -14,7 +14,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     
-    <!-- Tailwind CSS (CDN pour la démo, build process recommandé en prod) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
@@ -111,11 +111,39 @@
             transform: translateX(5px);
             border-left-width: 4px;
         }
+        
+        /* --- MENU BUTTONS (PAUSE & START) --- */
+        .menu-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            padding: 1rem 2rem;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .menu-btn:hover {
+            background: white;
+            color: black;
+            border-color: white;
+        }
 
         /* --- LOADING BAR --- */
         .loader-progress {
             transition: width 0.2s linear;
             box-shadow: 0 0 15px rgba(255,255,255,0.5);
+        }
+        
+        /* --- UTILS --- */
+        .blur-game {
+            filter: blur(5px);
+            transition: filter 0.3s ease;
         }
     </style>
 </head>
@@ -166,7 +194,8 @@
                 <div class="hud-text text-[10px] text-gray-300 leading-relaxed">
                     [WASD/ZQSD] MOUVEMENT<br>
                     [ESPACE] SAUT<br>
-                    [SOURIS] ORIENTATION
+                    [SOURIS] ORIENTATION<br>
+                    [ÉCHAP] PAUSE
                 </div>
             </div>
             
@@ -176,6 +205,25 @@
                     PHYSIQUE: <span class="text-[var(--color-success)]">ACTIVE</span>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Pause Screen -->
+    <div id="pause-screen" class="hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in">
+        <div class="w-full max-w-sm flex flex-col gap-4 p-8 border border-white/10 bg-black/50">
+            <h2 class="text-3xl text-white font-thin tracking-[0.5em] text-center mb-8 border-b border-white/20 pb-4">PAUSE</h2>
+            
+            <button id="resume-btn" class="menu-btn">
+                Reprendre
+            </button>
+            
+            <button id="restart-btn" class="menu-btn">
+                Recommencer Cycle
+            </button>
+            
+            <button id="menu-return-btn" class="menu-btn border-red-500/30 text-red-100 hover:text-red-500 hover:border-red-500">
+                Menu Principal
+            </button>
         </div>
     </div>
 
@@ -423,7 +471,7 @@
         /* --- GAME ENGINE (Core) --- */
         class GameEngine {
             constructor() {
-                this.state = 'MENU'; // MENU, PLAYING, TRANSITION, ENDING
+                this.state = 'MENU'; // MENU, PLAYING, PAUSED, TRANSITION, ENDING
                 this.container = document.body;
                 this.clock = new THREE.Clock();
                 this.audio = new AudioManager();
@@ -486,6 +534,7 @@
                         // 3. Graphics Init
                         this.initGraphics();
                         this.initInputs();
+                        this.initPauseMenu();
                         bar.style.width = '100%';
 
                         // 4. Launch Menu
@@ -533,20 +582,72 @@
 
                 window.addEventListener('resize', this.onResize);
                 
-                // Controls
+                // Controls logic updated for Pause
                 this.controls = new PointerLockControls(this.camera, document.body);
+                
                 this.controls.addEventListener('lock', () => {
-                    this.state = 'PLAYING';
-                    document.getElementById('ui-layer').style.opacity = '1';
-                    document.getElementById('start-screen').style.display = 'none';
-                    document.body.classList.remove('cursor-active');
+                    if (this.state === 'PAUSED') {
+                        // Returning from pause
+                        this.togglePause(false);
+                    } else if (this.state === 'MENU') {
+                         this.state = 'PLAYING';
+                         document.getElementById('ui-layer').style.opacity = '1';
+                         document.getElementById('start-screen').style.display = 'none';
+                         document.body.classList.remove('cursor-active');
+                    }
                 });
+
                 this.controls.addEventListener('unlock', () => {
-                    if (this.state !== 'ENDING' && this.state !== 'TRANSITION') {
-                        // Pause logic could go here
+                    // Si on est en train de jouer et qu'on déverrouille (Echap), on met en pause
+                    if (this.state === 'PLAYING') {
+                        this.togglePause(true);
+                    } else if (this.state !== 'ENDING' && this.state !== 'TRANSITION' && this.state !== 'PAUSED') {
                         document.body.classList.add('cursor-active');
                     }
                 });
+            }
+            
+            initPauseMenu() {
+                // Binding buttons
+                document.getElementById('resume-btn').onclick = () => {
+                    this.controls.lock(); // This triggers 'lock' event which sets state to PLAYING
+                };
+                
+                document.getElementById('restart-btn').onclick = () => {
+                    this.loadLevel(this.currentCycle);
+                    this.controls.lock();
+                    this.togglePause(false);
+                };
+                
+                document.getElementById('menu-return-btn').onclick = () => {
+                    this.togglePause(false);
+                    this.clearLevel();
+                    this.state = 'MENU';
+                    
+                    document.getElementById('pause-screen').style.display = 'none';
+                    document.getElementById('ui-layer').style.opacity = '0';
+                    document.getElementById('start-screen').style.display = 'flex';
+                    this.showLevelSelect();
+                    document.body.classList.add('cursor-active');
+                };
+            }
+            
+            togglePause(isPaused) {
+                const pauseScreen = document.getElementById('pause-screen');
+                const ui = document.getElementById('ui-layer');
+                
+                if (isPaused) {
+                    this.state = 'PAUSED';
+                    pauseScreen.style.display = 'flex';
+                    ui.classList.add('blur-game');
+                    document.body.classList.add('cursor-active');
+                } else {
+                    this.state = 'PLAYING';
+                    pauseScreen.style.display = 'none';
+                    ui.classList.remove('blur-game');
+                    document.body.classList.remove('cursor-active');
+                    this.clock.getDelta(); // Reset clock delta to prevent jump
+                }
             }
 
             initInputs() {
@@ -760,6 +861,12 @@
             /* --- GAMEPLAY LOOP --- */
             loop() {
                 requestAnimationFrame(this.loop);
+                
+                // Always render scene even when paused (prevents black screen)
+                if (this.state === 'PAUSED') {
+                    this.renderer.render(this.scene, this.camera);
+                    return;
+                }
                 
                 const dt = Math.min(this.clock.getDelta(), 0.1); // Clamp dt for safety
                 if(this.state !== 'PLAYING' && this.state !== 'ENDING') return;
